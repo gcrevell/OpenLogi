@@ -1092,6 +1092,22 @@ mod tests {
     }
 
     #[test]
+    fn accent_color_accepts_hash_and_shorthand_but_writes_canonical_hex() {
+        for written in ["#AE50FE", "ae50fe"] {
+            let set: AppSettings = toml::from_str(&format!("accent_color = \"{written}\""))
+                .expect("a hex accent parses");
+            assert_eq!(set.accent_color, Some(Rgb::new(0xae, 0x50, 0xfe)));
+            assert!(
+                toml::to_string(&set)
+                    .expect("serializes")
+                    .contains("accent_color = \"ae50fe\""),
+            );
+        }
+        let short: AppSettings = toml::from_str("accent_color = \"#f0a\"").expect("shorthand");
+        assert_eq!(short.accent_color, Some(Rgb::new(0xff, 0x00, 0xaa)));
+    }
+
+    #[test]
     fn smartshift_rejects_values_outside_the_persisted_contract() {
         let parse = |auto_disengage: u8, tunable_torque: u8| {
             let body = format!(

@@ -25,6 +25,7 @@ pub(super) fn appearance_page(
     view: Entity<SettingsView>,
     filter: ThemeFilter,
     theme_search: Entity<InputState>,
+    accent_hex: Entity<InputState>,
     language_select: Entity<SelectState<Vec<LanguageOption>>>,
 ) -> SettingPage {
     // Titled groups so the sidebar shows them as sub-items (gpui-component
@@ -76,7 +77,7 @@ pub(super) fn appearance_page(
         .item(
             SettingItem::new(
                 tr!("appearance.accent_color"),
-                SettingField::render(move |_, _, cx| accent_swatches(cx)),
+                SettingField::render(move |_, _, cx| accent_picker(&accent_hex, cx)),
             )
             .layout(Axis::Vertical)
             .description(tr!("appearance.accent_color_description")),
@@ -142,43 +143,122 @@ const ACCENT_PRESETS: [(&str, Option<u32>); 9] = [
     ("accent-graphite", Some(0x0064_748b)),
 ];
 
-/// A row of accent swatches, ringed on the one in use. A colour set by hand in
-/// the config (`accent_color = "rrggbb"`) matches no swatch and rings none.
+/// What the accent hex field's text asks for.
+#[derive(Debug, PartialEq, Eq)]
+enum AccentText {
+    /// Empty: the brand blue.
+    Default,
+    Color(Rgb),
+    /// Not a colour (yet); the accent is left as it was.
+    Invalid,
+}
+
+fn parse_accent_text(text: &str) -> AccentText {
+    let text = text.trim();
+    if text.is_empty() {
+        return AccentText::Default;
+    }
+    text.parse().map_or(AccentText::Invalid, AccentText::Color)
+}
+
+/// Apply the hex field's text. Returns whether it was a colour (or empty, for
+/// the default); text that is neither changes nothing.
+pub(super) fn apply_accent_text(text: &str, cx: &mut App) -> bool {
+    let color = match parse_accent_text(text) {
+        AccentText::Default => None,
+        AccentText::Color(color) => Some(color),
+        AccentText::Invalid => return false,
+    };
+    set_accent_color(cx, color);
+    true
+}
+
+/// The hex field's text for an accent: empty for the default blue.
+pub(super) fn accent_text(color: Option<Rgb>) -> String {
+    color.map_or_else(String::new, |color| format!("#{color}"))
+}
+
+/// The accent swatches above a hex field. Either one sets the accent; a click on
+/// a swatch rewrites the field (see `SettingsView::sync_accent_hex`).
+fn accent_picker(accent_hex: &Entity<InputState>, cx: &App) -> gpui::Div {
+    let invalid = parse_accent_text(accent_hex.read(cx).value().as_ref()) == AccentText::Invalid;
+    v_flex().gap_3().child(accent_swatches(cx)).child(
+        div()
+            .w(px(160.))
+            .rounded(px(6.))
+            .border_1()
+            .border_color(if invalid {
+                cx.theme().danger
+            } else {
+                gpui::transparent_black()
+            })
+            .child(control_input(accent_hex)),
+    )
+}
+
+/// A row of accent swatches, ringed on the one in use. A colour matching no
+/// preset (typed in the hex field, or set in the config) gets a swatch of its
+/// own at the end, ringed.
 fn accent_swatches(cx: &App) -> gpui::Div {
     let pal = theme::palette(cx);
     let current = AppState::try_read(cx)
         .and_then(|state| state.app_settings().accent_color)
         .map(Rgb::packed);
-    h_flex()
-        .gap_3()
-        .children(ACCENT_PRESETS.map(|(id, preset)| {
-            let selected = current == preset;
-            let fill = preset.unwrap_or(openlogi_ui::color::ACCENT_BLUE);
-            div()
-                .id(id)
-                .size(px(28.))
-                .flex()
-                .items_center()
-                .justify_center()
-                .rounded_full()
-                .border_2()
-                .border_color(if selected {
-                    pal.text_primary
-                } else {
-                    gpui::transparent_black()
-                })
-                .cursor_pointer()
-                .child(div().size(px(20.)).rounded_full().bg(rgb(fill)))
-                .on_click(move |_, _, cx| {
-                    set_accent_color(
-                        cx,
-                        preset.map(|packed| {
-                            let [_, r, g, b] = packed.to_be_bytes();
-                            Rgb::new(r, g, b)
-                        }),
-                    );
-                })
-        }))
+    let custom = current.filter(|packed| !ACCENT_PRESETS.iter().any(|(_, p)| *p == Some(*packed)));
+    let swatches = ACCENT_PRESETS
+        .map(|(id, preset)| (id, preset))
+        .into_iter()
+        .chain(custom.map(|packed| ("accent-custom", Some(packed))));
+    h_flex().gap_3().children(swatches.map(|(id, preset)| {
+        let selected = current == preset;
+        let fill = preset.unwrap_or(openlogi_ui::color::ACCENT_BLUE);
+        div()
+            .id(id)
+            .size(px(28.))
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded_full()
+            .border_2()
+            .border_color(if selected {
+                pal.text_primary
+            } else {
+                gpui::transparent_black()
+            })
+            .cursor_pointer()
+            .child(div().size(px(20.)).rounded_full().bg(rgb(fill)))
+            .on_click(move |_, _, cx| {
+                set_accent_color(
+                    cx,
+                    preset.map(|packed| {
+                        let [_, r, g, b] = packed.to_be_bytes();
+                        Rgb::new(r, g, b)
+                    }),
+                );
+            })
+    }))
+}
+
+#[cfg(test)]
+mod accent_text_tests {
+    use super::{AccentText, parse_accent_text};
+    use openlogi_core::color::Rgb;
+
+    #[test]
+    fn hex_text_maps_to_a_colour_the_default_or_invalid() {
+        let purple = AccentText::Color(Rgb::new(0xae, 0x50, 0xfe));
+        assert_eq!(parse_accent_text("#AE50FE"), purple);
+        assert_eq!(parse_accent_text("  ae50fe "), purple);
+        assert_eq!(
+            parse_accent_text("#f0a"),
+            AccentText::Color(Rgb::new(0xff, 0, 0xaa))
+        );
+        assert_eq!(parse_accent_text(""), AccentText::Default);
+        assert_eq!(parse_accent_text("   "), AccentText::Default);
+        for bad in ["#ae50f", "purple", "#ae50fg", "##ae50fe"] {
+            assert_eq!(parse_accent_text(bad), AccentText::Invalid, "{bad:?}");
+        }
+    }
 }
 
 /// Persist an interface-scale choice and repaint every desktop window. Each

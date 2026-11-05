@@ -121,6 +121,11 @@ pub struct SettingsView {
     theme_filter: ThemeFilter,
     /// Free-text filter for the Appearance theme grid (search 50+ themes by name).
     theme_search: Entity<InputState>,
+    /// Hex field under the Appearance accent swatches.
+    accent_hex: Entity<InputState>,
+    /// The accent the hex field last agreed with, so a swatch click or a config
+    /// edit rewrites the field but typing into it never does.
+    accent_hex_synced: Option<String>,
     /// Page selected when the window first opens. Consumed once by the Settings
     /// widget's keyed state, so it only steers a fresh open (an already-open
     /// window is just focused).
@@ -166,6 +171,10 @@ pub struct SettingsView {
 }
 
 impl SettingsView {
+    #[expect(
+        clippy::too_many_lines,
+        reason = "builds each settings widget once, in the order the pages read them"
+    )]
     fn new(initial_page: SettingsPage, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let focus_handle = cx.focus_handle();
         focus_handle.focus(window, cx);
@@ -211,6 +220,7 @@ impl SettingsView {
             }
         })
         .detach();
+        let accent_hex = Self::new_accent_hex(window, cx);
         let current = AppState::try_read(cx).and_then(|s| s.app_settings().language.clone());
         let options = language::language_options();
         let selected = language::selected_language_index(current.as_deref(), &options);
@@ -269,6 +279,8 @@ impl SettingsView {
             _installation_obs: installation_obs,
             theme_filter: ThemeFilter::All,
             theme_search,
+            accent_hex,
+            accent_hex_synced: None,
             initial_page,
             language_select,
             asset_source_select,
@@ -422,6 +434,40 @@ pub fn open_at(page: SettingsPage, cx: &mut App) {
     );
 }
 
+impl SettingsView {
+    /// Show the persisted accent in the hex field when it changed by any route
+    /// but typing: a swatch click, a reset, or a config reload.
+    fn new_accent_hex(window: &mut Window, cx: &mut Context<Self>) -> Entity<InputState> {
+        let input = cx.new(|cx| InputState::new(window, cx).placeholder("#RRGGBB"));
+        cx.subscribe(&input, |this, input, event: &InputEvent, cx| {
+            if matches!(event, InputEvent::Change) {
+                let text = input.read(cx).value().to_string();
+                if appearance::apply_accent_text(&text, cx) {
+                    this.accent_hex_synced = AppState::try_read(cx)
+                        .map(|s| appearance::accent_text(s.app_settings().accent_color));
+                }
+                cx.notify();
+            }
+        })
+        .detach();
+        input
+    }
+
+    fn sync_accent_hex(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(text) =
+            AppState::try_read(cx).map(|s| appearance::accent_text(s.app_settings().accent_color))
+        else {
+            return;
+        };
+        if self.accent_hex_synced.as_ref() == Some(&text) {
+            return;
+        }
+        self.accent_hex_synced = Some(text.clone());
+        self.accent_hex
+            .update(cx, |input, cx| input.set_value(text, window, cx));
+    }
+}
+
 impl Render for SettingsView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         theme::apply_ui_scale(window, cx);
@@ -431,6 +477,7 @@ impl Render for SettingsView {
             window,
             cx,
         );
+        self.sync_accent_hex(window, cx);
         // A failed write restores AppState's persisted configuration. Re-seat
         // these independently owned sliders so neither can keep presenting the
         // rejected value after that rollback.
@@ -480,6 +527,7 @@ impl Render for SettingsView {
                 view.clone(),
                 self.theme_filter,
                 self.theme_search.clone(),
+                self.accent_hex.clone(),
                 self.language_select.clone(),
             ))
             .page(assets::assets_page(
