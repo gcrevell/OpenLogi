@@ -103,6 +103,14 @@ haptics = true
 Top = { action = "Copy", icon = "Keyboard" }
 Right = { action = { OpenApplication = { path = "/Applications/Safari.app", display_name = "Safari" } }, icon = "Applications" }
 Bottom = { action = "ShowDesktop", label = "Desktop" }
+Left = { action = { OpenActionRing = "music" }, label = "Music" }
+
+# A named ring a slot opens with OpenActionRing. "root" goes back.
+[devices."receiver:aabbccdd:slot:1".action_ring.rings.music.slots]
+Top = { action = "PlayPause" }
+Right = { action = "NextTrack" }
+Left = { action = "PrevTrack" }
+Bottom = { action = { OpenActionRing = "root" }, label = "Back", icon = "Refresh" }
 
 [devices."receiver:aabbccdd:slot:1".lighting]
 enabled = true

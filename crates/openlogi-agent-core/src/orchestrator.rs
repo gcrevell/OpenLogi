@@ -1986,6 +1986,7 @@ impl Orchestrator {
             layout,
             language: self.config.app_settings.language.clone(),
             size: ring.size,
+            rings: ring.rings.clone(),
         })
     }
 

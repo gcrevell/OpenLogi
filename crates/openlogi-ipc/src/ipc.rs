@@ -185,6 +185,8 @@ pub use succession::Identity;
 ///      keyboard's HID++ `0x8010` G-keys, `0x8020` M-keys and `0x8030` MR
 ///      key. `ButtonId::{GKey, ModeKey}` appended — the G1–G5 slot of an M
 ///      profile and M1–M3/MR.
+///      `Action::OpenActionRing` appended — a ring slot that replaces the
+///      showing ring with a named layout.
 pub const PROTOCOL_VERSION: u32 = 46;
 
 /// Environment variable through which the agent hands a supervised helper the

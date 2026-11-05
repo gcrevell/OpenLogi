@@ -642,7 +642,14 @@ pub(crate) fn run_ring_activation(
     session_id: u64,
     activation: ActionRingActivation,
 ) {
-    dispatcher.dispatch(&activation.action, Some(&activation.device_key));
+    // A slot that opened another ring runs nothing: the ring is still up.
+    // The new session is begun before the buzz because beginning one clears
+    // the unplayed waveform, and the old one ends after it for the same
+    // reason as below.
+    match activation.opened_session {
+        Some(opened) => haptics.begin_session(opened, activation.haptic_route.clone()),
+        None => dispatcher.dispatch(&activation.action, Some(&activation.device_key)),
+    }
     haptics.play(
         activation.haptic_route,
         HapticWaveform::DampStateChange,

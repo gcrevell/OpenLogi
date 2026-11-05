@@ -18,6 +18,11 @@ mod icon;
 
 pub use icon::ActionRingIcon;
 
+/// The [`Action::OpenActionRing`] target that returns to the ring a session
+/// opened with — the default or per-app layout — rather than naming an entry of
+/// [`ActionRingConfig::rings`].
+pub const ROOT_RING: &str = "root";
+
 /// One of the eight fixed positions in an Actions Ring, clockwise from the top.
 ///
 /// Variant names are part of the TOML schema and must remain stable.
@@ -353,6 +358,10 @@ pub struct ActionRingConfig {
     /// Complete layout overrides keyed by foreground application identifier.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub per_app: BTreeMap<String, ActionRingLayout>,
+    /// Named layouts a slot reaches with [`Action::OpenActionRing`]. They are
+    /// shared by every application's ring; [`ROOT_RING`] is reserved.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub rings: BTreeMap<String, ActionRingLayout>,
 }
 
 impl Default for ActionRingConfig {
@@ -363,6 +372,7 @@ impl Default for ActionRingConfig {
             size: ActionRingSize::default(),
             default: ActionRingLayout::default(),
             per_app: BTreeMap::new(),
+            rings: BTreeMap::new(),
         }
     }
 }
@@ -387,6 +397,20 @@ impl ActionRingConfig {
             .and_then(|app| overlay_for(&self.per_app, aliases, app))
             .cloned()
             .unwrap_or_else(|| self.default.clone())
+    }
+
+    /// The layout a slot opens with [`Action::OpenActionRing`]: the named
+    /// entry of [`Self::rings`], or `root` for [`ROOT_RING`].
+    #[must_use]
+    pub fn ring_named<'a>(
+        &'a self,
+        root: &'a ActionRingLayout,
+        name: &str,
+    ) -> Option<&'a ActionRingLayout> {
+        if name == ROOT_RING {
+            return Some(root);
+        }
+        self.rings.get(name)
     }
 
     /// The key of the `per_app` layout [`Self::effective_layout`] resolves
@@ -579,6 +603,59 @@ Bottom = { action = { CustomShortcut = "Cmd+Shift+P" } }
                 .to_string()
                 .contains(&RingActionError::RecursiveTrigger.to_string()),
             "expected the recursion guard to reject the slot, got: {error}"
+        );
+    }
+
+    #[test]
+    fn named_rings_parse_and_a_slot_can_open_one() {
+        let config: ActionRingConfig = toml::from_str(
+            r#"
+            [default.slots.Top]
+            action = { OpenActionRing = "music" }
+
+            [rings.music.slots.Top]
+            action = "PlayPause"
+
+            [rings.music.slots.Bottom]
+            action = { OpenActionRing = "root" }
+            "#,
+        )
+        .expect("could not parse named rings");
+        assert_eq!(
+            config.default.slots[&ActionRingSlot::Top].action(),
+            &Action::OpenActionRing("music".to_string())
+        );
+        let music = config
+            .ring_named(&config.default, "music")
+            .expect("the music ring is configured");
+        assert_eq!(
+            music.slots[&ActionRingSlot::Top].action(),
+            &Action::PlayPause
+        );
+    }
+
+    #[test]
+    fn the_root_name_returns_to_the_layout_the_session_opened_with() {
+        let config = ActionRingConfig::default();
+        let root = ActionRingLayout::default();
+        assert_eq!(config.ring_named(&root, ROOT_RING), Some(&root));
+        assert_eq!(config.ring_named(&root, "missing"), None);
+    }
+
+    #[test]
+    fn a_config_without_named_rings_serializes_without_them() {
+        let encoded =
+            toml::to_string(&ActionRingConfig::default()).expect("could not serialize ring config");
+        assert!(!encoded.contains("rings"));
+    }
+
+    #[test]
+    fn opening_a_named_ring_is_a_valid_ring_action() {
+        let action = RingAction::new(Action::OpenActionRing("music".to_string()))
+            .expect("opening a named ring must be a valid ring action");
+        assert_eq!(
+            action.action(),
+            &Action::OpenActionRing("music".to_string())
         );
     }
 

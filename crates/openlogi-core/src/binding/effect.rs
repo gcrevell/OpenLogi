@@ -280,7 +280,8 @@ impl Action {
             | Action::ShowActionsRing
             | Action::PreviousKeypadPage
             | Action::NextKeypadPage
-            | Action::OpenApplication(_) => Effect::AgentSide,
+            | Action::OpenApplication(_)
+            | Action::OpenActionRing(_) => Effect::AgentSide,
 
             Action::ScrollUp => Effect::Scroll { dx: 0, dy: 1 },
             Action::ScrollDown => Effect::Scroll { dx: 0, dy: -1 },

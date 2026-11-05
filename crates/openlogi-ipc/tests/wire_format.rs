@@ -580,6 +580,7 @@ fn action_ring_types() {
 fn keypad_page_actions_and_slots() {
     assert_wire(&Action::PreviousKeypadPage, "3b");
     assert_wire(&Action::NextKeypadPage, "3c");
+    assert_wire(&Action::OpenActionRing("a".to_string()), "3d0161");
     assert_wire(
         &ButtonId::Grid(GridSlot {
             page: KeypadPage::new(2).expect("page 2 exists"),

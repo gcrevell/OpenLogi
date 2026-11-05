@@ -234,6 +234,12 @@ pub enum Action {
     /// Move the pressing keypad to its next binding page, wrapping from the
     /// last page to page 1. Appended — variant order is wire format.
     NextKeypadPage,
+    /// Replace the showing Actions Ring with the named ring from
+    /// [`ActionRingConfig::rings`](crate::binding::ActionRingConfig::rings).
+    /// Only meaningful as a ring slot; elsewhere it does nothing. The name
+    /// [`ROOT_RING`](crate::binding::ROOT_RING) returns to the ring that
+    /// opened the session. Appended — variant order is wire format.
+    OpenActionRing(String),
 }
 
 /// Which of a held chord's keys stay down for the lifetime of the press.
@@ -382,6 +388,7 @@ macro_rules! derive_action_core {
                     Action::RunShellCommand(_) => "Run Command".into(),
                     Action::Workflow(steps) => format!("Workflow ({} steps)", steps.len()),
                     Action::OpenApplication(target) => format!("Open {}", target.display_name()),
+                    Action::OpenActionRing(name) => name.clone(),
                     Action::HoldShortcut(combo) => format!("Hold {}", combo.rendered_label()),
                     Action::TapKeyHoldingModifiers(combo) => match combo.rendered_modifiers() {
                         Some(modifiers) => {
@@ -408,6 +415,7 @@ macro_rules! derive_action_core {
                     | Action::RunShellCommand(_)
                     | Action::Workflow(_)
                     | Action::OpenApplication(_)
+                    | Action::OpenActionRing(_)
                     | Action::HoldShortcut(_)
                     | Action::TapKeyHoldingModifiers(_) => None,
                 }
@@ -441,7 +449,7 @@ macro_rules! derive_action_core {
                     | Action::HoldShortcut(_)
                     | Action::TapKeyHoldingModifiers(_) => Category::Editing,
                     Action::SetDpiPreset(_) => Category::Dpi,
-                    Action::OpenApplication(_) => Category::System,
+                    Action::OpenApplication(_) | Action::OpenActionRing(_) => Category::System,
                 }
             }
 
