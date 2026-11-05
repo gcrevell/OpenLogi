@@ -3,6 +3,7 @@
 use super::language::{LanguageOption, language_select_field};
 use crate::ui::theme::FocusRingStyle as _;
 use gpui::{ElementId, img};
+use openlogi_core::color::Rgb;
 use openlogi_core::config::AppIcon;
 
 use super::{
@@ -74,6 +75,14 @@ pub(super) fn appearance_page(
         )
         .item(
             SettingItem::new(
+                tr!("appearance.accent_color"),
+                SettingField::render(move |_, _, cx| accent_swatches(cx)),
+            )
+            .layout(Axis::Vertical)
+            .description(tr!("appearance.accent_color_description")),
+        )
+        .item(
+            SettingItem::new(
                 tr!("appearance.interface_scale"),
                 SettingField::render(move |_, _, cx| scale_segment(cx)),
             )
@@ -111,6 +120,65 @@ fn set_appearance(cx: &mut App, appearance: Appearance) {
 fn set_radius(cx: &mut App, radius: Option<u8>) {
     AppState::apply(cx, |state| state.commit_ui_radius(radius));
     theme::apply_from_settings(None, cx);
+}
+
+/// Persist an accent choice and re-apply the live theme. `None` is the brand
+/// blue.
+fn set_accent_color(cx: &mut App, color: Option<Rgb>) {
+    AppState::apply(cx, |state| state.commit_accent_color(color));
+    theme::apply_from_settings(None, cx);
+}
+
+/// The accent presets, as `(id, colour)`. The first, `None`, is the brand blue.
+const ACCENT_PRESETS: [(&str, Option<u32>); 9] = [
+    ("accent-default", None),
+    ("accent-violet", Some(0x008b_5cf6)),
+    ("accent-pink", Some(0x00ec_4899)),
+    ("accent-red", Some(0x00ef_4444)),
+    ("accent-orange", Some(0x00f9_7316)),
+    ("accent-amber", Some(0x00ca_8a04)),
+    ("accent-green", Some(0x0016_a34a)),
+    ("accent-teal", Some(0x000d_9488)),
+    ("accent-graphite", Some(0x0064_748b)),
+];
+
+/// A row of accent swatches, ringed on the one in use. A colour set by hand in
+/// the config (`accent_color = "rrggbb"`) matches no swatch and rings none.
+fn accent_swatches(cx: &App) -> gpui::Div {
+    let pal = theme::palette(cx);
+    let current = AppState::try_read(cx)
+        .and_then(|state| state.app_settings().accent_color)
+        .map(Rgb::packed);
+    h_flex()
+        .gap_3()
+        .children(ACCENT_PRESETS.map(|(id, preset)| {
+            let selected = current == preset;
+            let fill = preset.unwrap_or(openlogi_ui::color::ACCENT_BLUE);
+            div()
+                .id(id)
+                .size(px(28.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded_full()
+                .border_2()
+                .border_color(if selected {
+                    pal.text_primary
+                } else {
+                    gpui::transparent_black()
+                })
+                .cursor_pointer()
+                .child(div().size(px(20.)).rounded_full().bg(rgb(fill)))
+                .on_click(move |_, _, cx| {
+                    set_accent_color(
+                        cx,
+                        preset.map(|packed| {
+                            let [_, r, g, b] = packed.to_be_bytes();
+                            Rgb::new(r, g, b)
+                        }),
+                    );
+                })
+        }))
 }
 
 /// Persist an interface-scale choice and repaint every desktop window. Each

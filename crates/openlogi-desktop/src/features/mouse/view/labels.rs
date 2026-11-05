@@ -6,12 +6,12 @@ use super::super::thumbwheel::ThumbwheelPreset;
 use crate::features::binding_editor::{GESTURE_BUTTON_ICON, action_icon_path};
 use crate::ui::action::localized_action_label;
 use crate::ui::theme::FocusRingStyle as _;
-use crate::ui::theme::{self, ACCENT_BLUE, Typography as _};
+use crate::ui::theme::{self, Typography as _, accent};
 use gpui::{
     App, ElementId, Entity, Hsla, IndentAdjustment, InteractiveElement, IntoElement, LineFragment,
     ParentElement, Pixels, Refineable as _, RenderOnce, SharedString,
     StatefulInteractiveElement as _, Styled, Window, div, prelude::FluentBuilder as _, px, rems,
-    rgb, svg,
+    svg,
 };
 use gpui_kit::base::Button as BaseButton;
 use gpui_kit::component::{Icon, IconName, h_flex};
@@ -254,7 +254,7 @@ impl RenderOnce for LabelTrigger {
         let click_view = view.clone();
         let pal = theme::palette(cx);
         let binding_color = if highlighted {
-            rgb(ACCENT_BLUE).into()
+            accent()
         } else {
             pal.text_primary
         };
@@ -278,7 +278,7 @@ impl RenderOnce for LabelTrigger {
             .rounded(pal.control_radius)
             .border_1()
             .border_color(if highlighted {
-                rgb(ACCENT_BLUE).into()
+                accent()
             } else {
                 pal.border
             })

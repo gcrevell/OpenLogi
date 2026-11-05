@@ -54,7 +54,9 @@ optional physical device key.
 - startup, update, menu-bar / tray, input-capture, and asset-download toggles
 - `asset_source`: `automatic`, `openlogi`, `cloudflare`, or `fastly`
 - `language`, `appearance`, `device_view_mode` (`grid`, `list`, or `carousel`),
-  optional theme names, and optional UI radius
+  optional theme names, optional UI radius, and an optional `accent_color`
+  (`"rrggbb"`, no `#`) that replaces the default blue in the settings app and the
+  Actions Ring
 - `smooth_scroll` toggles finite animation for traditional mouse-wheel input. With it
   off, a diverted horizontal thumb wheel still scrolls as a phased gesture (ended after
   120 ms idle) so apps that reveal content on horizontal swipes, like Messages, react;

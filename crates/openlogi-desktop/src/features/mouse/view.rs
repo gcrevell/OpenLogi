@@ -6,7 +6,7 @@ use gpui::{
     AnyElement, App, AppContext as _, Context, ElementId, Entity, FocusHandle, Focusable, Hsla,
     InteractiveElement, IntoElement, ParentElement, Pixels, Render, RenderOnce, SharedString, Size,
     StatefulInteractiveElement as _, Styled, Subscription, Window, canvas, div, hsla, img,
-    prelude::FluentBuilder as _, px, rgb, size,
+    prelude::FluentBuilder as _, px, size,
 };
 use gpui_kit::base::{Button as BaseButton, ElementExt as _};
 use gpui_kit::component::{
@@ -33,7 +33,7 @@ use crate::features::keyboard::editors::{PowerUserKind, text_editor_placeholder}
 use crate::features::profiles::{profile_canvas_status, profile_name};
 use crate::services::assets::{GlowGeometry, ResolvedAsset};
 use crate::state::{AppState, BindingLayer, DeviceKey, DeviceRecord, StateEvent};
-use crate::ui::theme::{self, ACCENT_BLUE};
+use crate::ui::theme::{self, accent};
 
 const SIDE_GAP: f32 = 24.;
 /// The narrowest a label card gets, however short its values.
@@ -1089,12 +1089,12 @@ impl RenderOnce for HotspotTrigger {
                     .rounded_full()
                     .border_1()
                     .border_color(if highlighted {
-                        gpui::Hsla::from(rgb(ACCENT_BLUE))
+                        accent()
                     } else {
                         hsla(0., 0., 0.95, 0.85)
                     })
                     .bg(if highlighted {
-                        gpui::Hsla::from(rgb(ACCENT_BLUE))
+                        accent()
                     } else {
                         hsla(0., 0., 0.18, 0.85)
                     }),

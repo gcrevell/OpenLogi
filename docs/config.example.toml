@@ -21,6 +21,9 @@ ui_scale = "normal"
 device_view_mode = "grid"
 # macOS only: "openlogi" (the signed icon) or "prism".
 app_icon = "openlogi"
+# Optional accent colour, "rrggbb" (no #), replacing the default blue in the app and
+# the Actions Ring. Leave unset for the default.
+# accent_color = "e11d48"
 # macOS only: Previous / Next Desktop slide like a three-finger swipe (default
 # true); false switches at once.
 animate_desktop_switch = true

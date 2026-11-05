@@ -525,9 +525,11 @@ fn action_ring_types() {
             )]),
             language: Some("fr".to_string()),
             size: ActionRingSize::Large,
+            accent: Some(0x00e1_1d48),
         },
-        // The size is one trailing byte after the locale.
-        "2a01000343757400070102667202",
+        // The size is one byte after the locale, then the optional accent: a
+        // presence byte and the packed colour as a varint-encoded u32.
+        "2a0100034375740007010266720201fc481de100",
     );
     // The literal flag is one byte between label and icon.
     assert_wire(

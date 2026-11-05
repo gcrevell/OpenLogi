@@ -33,7 +33,7 @@ use gpui::{
     InteractiveElement, IntoElement, ParentElement, PathBuilder, Refineable as _, Render,
     RenderOnce, Role, ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled,
     Subscription, TextStyle, Window, canvas, div, hsla, linear_color_stop, linear_gradient, point,
-    prelude::FluentBuilder as _, px, rems, rgb, svg,
+    prelude::FluentBuilder as _, px, rems, svg,
 };
 use gpui_kit::base::ElementExt as _;
 use gpui_kit::component::tooltip::Tooltip;
@@ -59,7 +59,7 @@ use crate::services::assets::{GlowGeometry, ResolvedAsset};
 use crate::state::{AppState, DeviceKey, DeviceRecord, GamingKeys, StateEvent, StateEvents};
 use crate::ui::action::localized_action_label;
 use crate::ui::components::{MenuRow, control_button};
-use crate::ui::theme::{self, ACCENT_BLUE, Palette, SCREEN_PAD, Typography as _};
+use crate::ui::theme::{self, Palette, SCREEN_PAD, Typography as _, accent};
 use gpui::{Animation, AnimationExt, ease_out_quint, img};
 use openlogi_core::hid::KeypadDescriptor;
 
@@ -654,7 +654,7 @@ fn binding_line(
                     .size(px(9.))
                     .flex_none()
                     .text_color(if highlighted {
-                        rgb(ACCENT_BLUE).into()
+                        accent()
                     } else {
                         pal.text_muted
                     }),
@@ -668,7 +668,7 @@ fn binding_line(
                 .whitespace_nowrap()
                 .text_caption()
                 .text_color(if highlighted {
-                    rgb(ACCENT_BLUE).into()
+                    accent()
                 } else {
                     pal.text_muted
                 })
@@ -1273,7 +1273,7 @@ impl RenderOnce for KeyCallout {
         let summary = self.slot.summary();
         let tooltip = summary.clone();
         let icon_color = if highlighted {
-            rgb(ACCENT_BLUE).into()
+            accent()
         } else if self.slot.bound {
             pal.text_primary
         } else {
@@ -1295,11 +1295,7 @@ impl RenderOnce for KeyCallout {
             .items_center()
             .rounded_md()
             .border_1()
-            .border_color(if highlighted {
-                rgb(ACCENT_BLUE).into()
-            } else {
-                pal.border
-            })
+            .border_color(if highlighted { accent() } else { pal.border })
             .bg(if highlighted {
                 theme::accent_tint()
             } else {
@@ -1379,8 +1375,8 @@ fn key_click_target(
                             .h(px(KEY_HOTSPOT_DOT))
                             .rounded_full()
                             .border_1()
-                            .border_color(gpui::Hsla::from(rgb(ACCENT_BLUE)))
-                            .bg(gpui::Hsla::from(rgb(ACCENT_BLUE))),
+                            .border_color(accent())
+                            .bg(accent()),
                     )
                     .rounded_full()
                     .border_1()
@@ -1465,7 +1461,7 @@ fn paint_keyboard_leaders(
         }
         if let Ok(path) = path.build() {
             if highlighted {
-                window.paint_path(path, rgb(ACCENT_BLUE));
+                window.paint_path(path, accent());
             } else {
                 window.paint_path(path, hsla(0., 0., 0.55, 0.35));
             }
@@ -1587,7 +1583,7 @@ impl FunctionRowView {
                                         gpui_kit::component::IconName::Check,
                                     )
                                     .size_3()
-                                    .text_color(rgb(ACCENT_BLUE)),
+                                    .text_color(accent()),
                                 ),
                         )
                     })
@@ -1754,7 +1750,7 @@ fn panel_action_rows(
                                     gpui_kit::component::IconName::Check,
                                 )
                                 .size_3()
-                                .text_color(rgb(ACCENT_BLUE)),
+                                .text_color(accent()),
                             )
                         })
                         .on_click(move |_ev, _window, cx| {

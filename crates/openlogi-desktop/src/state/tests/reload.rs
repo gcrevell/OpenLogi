@@ -5,6 +5,19 @@ use openlogi_core::config::{ConfigFile, ConfigRevision, MouseProfileTarget};
 use openlogi_core::update_feed::UpdateChannel;
 
 #[test]
+fn accent_color_commits_and_resets() {
+    let resolver = AssetResolver::new();
+    let (commands, _receiver) = tokio::sync::mpsc::unbounded_channel();
+    let mut state = AppState::new(Sources::in_memory(Config::ephemeral(), &resolver, commands));
+    let rose = openlogi_core::color::Rgb::new(0xe1, 0x1d, 0x48);
+
+    let _ = state.commit_accent_color(Some(rose));
+    assert_eq!(state.app_settings().accent_color, Some(rose));
+    let _ = state.commit_accent_color(None);
+    assert_eq!(state.app_settings().accent_color, None);
+}
+
+#[test]
 fn read_only_config_rolls_back_mutations_and_does_not_reload_agent() {
     let resolver = AssetResolver::new();
     let (commands, mut receiver) = tokio::sync::mpsc::unbounded_channel();

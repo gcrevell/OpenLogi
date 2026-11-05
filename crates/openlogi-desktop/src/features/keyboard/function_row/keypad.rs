@@ -9,7 +9,7 @@
 use gpui::{
     App, Entity, FontWeight, InteractiveElement, IntoElement, ParentElement, RenderOnce,
     SharedString, StatefulInteractiveElement as _, Styled, Window, div, hsla,
-    prelude::FluentBuilder as _, px, rgb, svg,
+    prelude::FluentBuilder as _, px, svg,
 };
 use gpui_kit::component::button::{Button, ButtonGroup, ButtonVariant, ButtonVariants as _};
 use gpui_kit::component::dialog::DialogButtonProps;
@@ -30,7 +30,7 @@ use super::{
 use crate::features::mouse::geometry::asset_dimensions_for_png;
 use crate::services::assets::ResolvedAsset;
 use crate::state::AppState;
-use crate::ui::theme::{self, ACCENT_BLUE, Palette, Typography as _};
+use crate::ui::theme::{self, Palette, Typography as _, accent};
 
 /// A keypad's last binding page — the one the page bar can remove.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -328,7 +328,7 @@ impl RenderOnce for PhotoKey {
         let top = self.slot.y_frac * self.render.1 - shape.h / 2. - outer;
         let tooltip = self.slot.summary();
         let ring = match state {
-            KeyState::Selected => rgb(ACCENT_BLUE).into(),
+            KeyState::Selected => accent(),
             KeyState::Hovered => hsla(0., 0., 1., 0.55),
             KeyState::Rest => hsla(0., 0., 0., 0.),
         };
@@ -479,11 +479,7 @@ impl RenderOnce for KeyCap {
             .gap(px(1.))
             .rounded_md()
             .border_1()
-            .border_color(if highlighted {
-                rgb(ACCENT_BLUE).into()
-            } else {
-                pal.border
-            })
+            .border_color(if highlighted { accent() } else { pal.border })
             .bg(if highlighted {
                 theme::accent_tint()
             } else {
@@ -506,7 +502,7 @@ impl RenderOnce for KeyCap {
                     .text_base()
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(if highlighted {
-                        rgb(ACCENT_BLUE).into()
+                        accent()
                     } else {
                         pal.text_primary
                     })

@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use gpui::{
     Context, Entity, FocusHandle, InteractiveElement, IntoElement, ParentElement, Role,
-    StatefulInteractiveElement as _, Styled, div, prelude::FluentBuilder as _, px, rgb, svg,
+    StatefulInteractiveElement as _, Styled, div, prelude::FluentBuilder as _, px, svg,
 };
 use gpui_kit::base::Button as BaseButton;
 use gpui_kit::component::{
@@ -28,7 +28,7 @@ use crate::features::binding_editor::{
 use crate::state::AppState;
 use crate::ui::action::localized_action_label;
 use crate::ui::components::{MenuRow, Toggle, control_button, control_input, toggle_row};
-use crate::ui::theme::{self, ACCENT_BLUE, Palette, Typography as _};
+use crate::ui::theme::{self, Palette, Typography as _, accent};
 
 pub(super) const INSPECTOR_W: f32 = 328.;
 
@@ -570,11 +570,7 @@ fn gesture_directions(
                                 ),
                         )
                         .when(selected, |row| {
-                            row.child(
-                                Icon::new(IconName::Check)
-                                    .size_3()
-                                    .text_color(rgb(ACCENT_BLUE)),
-                            )
+                            row.child(Icon::new(IconName::Check).size_3().text_color(accent()))
                         })
                         .on_click(move |_, _, cx| {
                             view.update(cx, |view, cx| {
@@ -664,9 +660,7 @@ fn thumbwheel_inspector(
                                 )
                                 .when(selected, |row| {
                                     row.child(
-                                        Icon::new(IconName::Check)
-                                            .size_3()
-                                            .text_color(rgb(ACCENT_BLUE)),
+                                        Icon::new(IconName::Check).size_3().text_color(accent()),
                                     )
                                 })
                                 .on_click(move |_, _, cx| {

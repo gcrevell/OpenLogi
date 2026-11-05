@@ -5,6 +5,7 @@ use super::events::StateEvents;
 use super::{AppState, StateEvent};
 use crate::platform::app_icon::AppIconExt as _;
 use gpui_kit::component::ThemeMode;
+use openlogi_core::color::Rgb;
 use openlogi_core::config::{
     AppIcon, AppSettings, Appearance, AssetSourcePreference, DeviceViewMode, MomentumScrolling,
     MouseProfileTarget, ThumbwheelSensitivity, UiScale, VerticalScrollSensitivity,
@@ -167,6 +168,17 @@ impl AppState {
         self.config
             .edit(|config| config.app_settings.ui_radius = radius);
         self.persist_config("UI radius setting");
+        StateEvent::SettingsChanged.into()
+    }
+    /// Persist the accent colour override (`None` = the brand blue). An
+    /// already-set value writes nothing and is still reported.
+    pub fn commit_accent_color(&mut self, color: Option<Rgb>) -> StateEvents {
+        if self.config.app_settings.accent_color == color {
+            return StateEvent::SettingsChanged.into();
+        }
+        self.config
+            .edit(|config| config.app_settings.accent_color = color);
+        self.persist_config("accent color setting");
         StateEvent::SettingsChanged.into()
     }
     /// Persist the Home device-gallery layout. An already-set value writes

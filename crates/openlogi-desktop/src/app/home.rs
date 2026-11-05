@@ -290,7 +290,7 @@ pub(super) fn transport_icon(
         )
     };
     let color: Hsla = match glyph {
-        ConnectionGlyph::Bluetooth => rgb(theme::ACCENT_BLUE).into(),
+        ConnectionGlyph::Bluetooth => theme::accent(),
         ConnectionGlyph::Bolt | ConnectionGlyph::Unifying | ConnectionGlyph::Dongle => {
             rgb(theme::STATUS_CONNECTED).into()
         }

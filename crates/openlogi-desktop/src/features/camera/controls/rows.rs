@@ -4,11 +4,11 @@ use crate::state::AppState;
 use crate::ui::components::ProfileTab;
 use crate::ui::slider_row::SliderRow;
 use crate::ui::theme::FocusRingStyle as _;
-use crate::ui::theme::{self, ACCENT_BLUE, Palette, Typography as _};
+use crate::ui::theme::{self, Palette, Typography as _, accent};
 use gpui::{
     ClickEvent, Context, ElementId, InteractiveElement, IntoElement, MouseButton, MouseDownEvent,
     ParentElement, Role, SharedString, StatefulInteractiveElement as _, Styled, Toggled, div,
-    prelude::FluentBuilder as _, rgb,
+    prelude::FluentBuilder as _,
 };
 use gpui_kit::base::Button as BaseButton;
 use gpui_kit::component::{IconName, Selectable as _, h_flex, slider::Slider};
@@ -131,7 +131,7 @@ fn control_row(
         .zip(slider.control.auto_toggle())
         .and_then(|(on, toggle)| {
             let auto_ix = panel.autos.iter().position(|a| a.toggle == toggle)?;
-            let accent = rgb(ACCENT_BLUE);
+            let accent = accent();
             Some(
                 BaseButton::new((ElementId::from("camera-control-auto"), toggle.name()))
                     .role(Role::CheckBox)
@@ -142,7 +142,7 @@ fn control_row(
                     .py_0p5()
                     .rounded_full()
                     .border_1()
-                    .border_color(if on { accent.into() } else { pal.border })
+                    .border_color(if on { accent } else { pal.border })
                     .text_caption()
                     .text_color(if on { pal.text_primary } else { pal.text_muted })
                     .bg(if on {
@@ -243,7 +243,7 @@ fn frequency_row(
     .filter(|(value, _, _)| slider.range.supports(*value))
     {
         let active = value == current;
-        let accent = rgb(ACCENT_BLUE);
+        let accent = accent();
         let accessibility_label = label.clone();
         choices = choices.child(
             BaseButton::new(("camera-frequency", id))
@@ -260,7 +260,7 @@ fn frequency_row(
                 .py_0p5()
                 .rounded_full()
                 .border_1()
-                .border_color(if active { accent.into() } else { pal.border })
+                .border_color(if active { accent } else { pal.border })
                 .text_caption()
                 .text_color(if active {
                     pal.text_primary
@@ -296,7 +296,7 @@ fn binary_control_row(
 ) -> gpui::Stateful<gpui::Div> {
     let slider = &panel.sliders[ix];
     let on = slider.value(cx) != 0;
-    let accent = rgb(ACCENT_BLUE);
+    let accent = accent();
     choice_row(
         ix,
         slider.label.clone(),
@@ -309,7 +309,7 @@ fn binary_control_row(
             .py_0p5()
             .rounded_full()
             .border_1()
-            .border_color(if on { accent.into() } else { pal.border })
+            .border_color(if on { accent } else { pal.border })
             .text_caption()
             .text_color(if on { pal.text_primary } else { pal.text_muted })
             .bg(if on {
