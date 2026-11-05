@@ -7,7 +7,7 @@ use crate::ui::theme::FocusRingStyle as _;
 use gpui::{
     App, AppContext as _, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement,
     ParentElement, Render, ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled,
-    Subscription, Window, div, prelude::FluentBuilder as _, px, rgb, svg,
+    Subscription, Window, div, prelude::FluentBuilder as _, px, svg,
 };
 use gpui_kit::base::Button as BaseButton;
 use gpui_kit::component::{
@@ -371,7 +371,7 @@ fn slot_button(
         .rounded_full()
         .border_2()
         .border_color(if selected {
-            rgb(theme::ACCENT_BLUE).into()
+            theme::accent()
         } else {
             pal.border
         })

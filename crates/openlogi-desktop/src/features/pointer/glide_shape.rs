@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use gpui::{
     Bounds, Hsla, IntoElement, ParentElement, PathBuilder, Pixels, SharedString, Styled, Window,
-    canvas, div, point, px, rgb,
+    canvas, div, point, px,
 };
 use gpui_kit::component::{Selectable as _, h_flex, v_flex};
 use openlogi_core::config::{GlideShape, MomentumParams, MomentumScrolling as M};
@@ -18,7 +18,7 @@ use openlogi_core::scroll::GlideCurve;
 use super::momentum::{MomentumScope, commit};
 use crate::ui::choice_card::ChoiceCard;
 use crate::ui::slider_row::SliderRow;
-use crate::ui::theme::{ACCENT_BLUE, Palette, Typography as _};
+use crate::ui::theme::{Palette, Typography as _, accent};
 
 /// Points each curve is drawn through.
 const SAMPLES: u16 = 48;
@@ -174,7 +174,7 @@ fn tile(
     pal: Palette,
 ) -> ChoiceCard {
     let selected = shape == current;
-    let accent = Hsla::from(rgb(ACCENT_BLUE));
+    let accent = accent();
     let color = if selected { accent } else { pal.text_primary };
     let geometry = geometry(shape, params);
     let name = shape_name(shape);

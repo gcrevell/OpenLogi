@@ -6,10 +6,10 @@
 //! thicker line; the other controls keep muted lines so their mapping remains
 //! visible.
 
-use gpui::{Bounds, PathBuilder, Pixels, Point, Window, hsla, point, px, rgb};
+use gpui::{Bounds, PathBuilder, Pixels, Point, Window, hsla, point, px};
 
 use super::hotspots::{Hotspot, MouseControlId};
-use crate::ui::theme::ACCENT_BLUE;
+use crate::ui::theme::accent;
 
 /// How far past the silhouette a leader's 45° run may reach. Kept small
 /// enough to fit inside the gap between mouse and card so the run never ends
@@ -110,7 +110,7 @@ fn paint_one(
 
     if let Ok(built) = path.build() {
         if highlight {
-            window.paint_path(built, rgb(ACCENT_BLUE));
+            window.paint_path(built, accent());
         } else {
             // Muted gray — readable against the dark background without
             // competing with the highlighted line.

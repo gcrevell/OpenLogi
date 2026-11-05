@@ -293,6 +293,10 @@ pub struct AppSettings {
     /// `0` / `6` / `12`). `None` keeps each theme's own radius.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ui_radius: Option<u8>,
+    /// Accent colour override, written `"rrggbb"` (no `#`). `None` keeps the OpenLogi
+    /// brand blue. Applies to the settings app and the Actions Ring overlay.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accent_color: Option<Rgb>,
     /// Application used to select per-app mouse button bindings. Defaults to
     /// the application under the pointer; unsupported platforms and
     /// unidentified pointer targets use focus.
@@ -519,6 +523,7 @@ impl Default for AppSettings {
             theme_light: None,
             theme_dark: None,
             ui_radius: None,
+            accent_color: None,
             mouse_profile_target: MouseProfileTarget::Pointer,
             low_battery_notifications: true,
             lock_key_notifications: true,
@@ -1066,6 +1071,41 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn accent_color_is_optional_and_round_trips_as_hex() {
+        let none: AppSettings = toml::from_str("").expect("an empty table is valid");
+        assert_eq!(none.accent_color, None);
+        let set: AppSettings =
+            toml::from_str("accent_color = \"e11d48\"").expect("a hex accent parses");
+        assert_eq!(set.accent_color, Some(Rgb::new(0xe1, 0x1d, 0x48)));
+        let out = toml::to_string(&set).expect("serializes");
+        assert!(out.contains("accent_color = \"e11d48\""), "{out}");
+        toml::from_str::<AppSettings>("accent_color = \"blue\"")
+            .expect_err("a non-hex accent is rejected");
+        assert!(
+            !toml::to_string(&none)
+                .expect("serializes")
+                .contains("accent_color"),
+            "the default writes nothing"
+        );
+    }
+
+    #[test]
+    fn accent_color_accepts_hash_and_shorthand_but_writes_canonical_hex() {
+        for written in ["#AE50FE", "ae50fe"] {
+            let set: AppSettings = toml::from_str(&format!("accent_color = \"{written}\""))
+                .expect("a hex accent parses");
+            assert_eq!(set.accent_color, Some(Rgb::new(0xae, 0x50, 0xfe)));
+            assert!(
+                toml::to_string(&set)
+                    .expect("serializes")
+                    .contains("accent_color = \"ae50fe\""),
+            );
+        }
+        let short: AppSettings = toml::from_str("accent_color = \"#f0a\"").expect("shorthand");
+        assert_eq!(short.accent_color, Some(Rgb::new(0xff, 0x00, 0xaa)));
+    }
 
     #[test]
     fn smartshift_rejects_values_outside_the_persisted_contract() {

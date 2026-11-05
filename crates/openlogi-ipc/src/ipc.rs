@@ -186,7 +186,8 @@ pub use succession::Identity;
 ///      key. `ButtonId::{GKey, ModeKey}` appended — the G1–G5 slot of an M
 ///      profile and M1–M3/MR.
 ///      `Action::OpenActionRing` appended — a ring slot that replaces the
-///      showing ring with a named layout.
+///      showing ring with a named layout. `ActionRingInvocation::accent`
+///      appended, the user's accent colour override.
 pub const PROTOCOL_VERSION: u32 = 46;
 
 /// Environment variable through which the agent hands a supervised helper the
@@ -800,6 +801,9 @@ pub struct ActionRingInvocation {
     pub language: Option<String>,
     /// How large the overlay draws this ring.
     pub size: ActionRingSize,
+    /// The user's accent colour override, packed `0x00rrggbb`, or `None` for
+    /// the brand blue.
+    pub accent: Option<u32>,
 }
 
 /// The ring the overlay should be showing, stamped with its generation.

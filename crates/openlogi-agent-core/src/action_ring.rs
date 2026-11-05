@@ -60,6 +60,8 @@ pub struct ActionRingSessionSpec {
     pub language: Option<String>,
     /// How large the overlay draws the ring.
     pub size: ActionRingSize,
+    /// The user's accent colour override, packed `0x00rrggbb`.
+    pub accent: Option<u32>,
     /// Named layouts a slot can open with [`Action::OpenActionRing`].
     pub rings: BTreeMap<String, ActionRingLayout>,
 }
@@ -215,6 +217,7 @@ impl ActionRingManager {
             spec.haptic_route,
             spec.language,
             spec.size,
+            spec.accent,
             true,
         );
         let invocation = session.invocation.clone();
@@ -238,6 +241,7 @@ impl ActionRingManager {
         haptic_route: Option<DeviceRoute>,
         language: Option<String>,
         size: ActionRingSize,
+        accent: Option<u32>,
         trigger_held: bool,
     ) -> Session {
         let session_id = self.next_session.fetch_add(1, Ordering::Relaxed);
@@ -262,6 +266,7 @@ impl ActionRingManager {
                 slots,
                 language,
                 size,
+                accent,
             },
             device_key,
             haptic_route,
@@ -299,6 +304,7 @@ impl ActionRingManager {
             session.haptic_route.clone(),
             session.invocation.language,
             session.invocation.size,
+            session.invocation.accent,
             false,
         );
         let opened_session = replacement.invocation.session_id;
@@ -512,6 +518,7 @@ mod tests {
             layout: ActionRingConfig::default().default,
             language: None,
             size: ActionRingSize::default(),
+            accent: None,
             rings: BTreeMap::new(),
         }
     }
@@ -531,6 +538,24 @@ mod tests {
 
     /// A ring whose Top slot opens `music`, whose own Top plays and whose
     /// Bottom goes back.
+    #[test]
+    fn accent_reaches_the_invocation_and_survives_a_ring_swap() {
+        let manager = ActionRingManager::default();
+        let mut with_accent = nested_spec();
+        with_accent.accent = Some(0x00e1_1d48);
+        let invocation = manager.begin(with_accent);
+        assert_eq!(invocation.accent, Some(0x00e1_1d48));
+        manager
+            .activate(invocation.session_id, ActionRingSlot::Top)
+            .expect("the slot opens the music ring");
+        let after = manager
+            .state()
+            .active
+            .as_ref()
+            .map(|session| session.invocation.accent);
+        assert_eq!(after, Some(Some(0x00e1_1d48)));
+    }
+
     fn nested_spec() -> ActionRingSessionSpec {
         let mut spec = spec();
         spec.layout = layout_of(&[

@@ -1131,7 +1131,7 @@ fn home_transport_icon_paints_in_its_transport_color(cx: &mut gpui::TestAppConte
     let expected: [(&DeviceRecord, Hsla); 4] = [
         (&bolt, rgb(theme::STATUS_CONNECTED).into()),
         (&lightspeed, rgb(theme::STATUS_CONNECTED).into()),
-        (&bluetooth, rgb(theme::ACCENT_BLUE).into()),
+        (&bluetooth, theme::accent()),
         (&camera, pal.text_muted),
     ];
     for (record, color) in expected {

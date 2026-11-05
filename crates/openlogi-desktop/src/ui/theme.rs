@@ -15,7 +15,7 @@
 #[cfg(test)]
 use gpui::rgb;
 use gpui::{
-    App, BoxShadow, FontWeight, Hsla, Pixels, Rems, Rgba, Styled, Window, hsla, px, relative, rems,
+    App, BoxShadow, FontWeight, Hsla, Pixels, Rems, Rgba, Styled, Window, px, relative, rems,
 };
 use gpui_kit::component::{ActiveTheme as _, Theme, ThemeMode, ThemeRegistry};
 use openlogi_core::config::{Appearance, UiScale};
@@ -28,7 +28,7 @@ use super::spacing::DynamicSpacing;
 // this app does — it cannot depend on this crate, and a local copy is how the
 // ring ended up with a blue of its own. Re-exported so screens keep reading it
 // off `theme::`, beside the status hues and the appearance-derived [`Palette`].
-pub use openlogi_ui::color::{ACCENT_BLUE, accent};
+pub use openlogi_ui::color::accent;
 
 /// Status colours for the connectivity readouts. Fixed like the accent, but the
 /// overlay draws no status, so they stay with the app that does.
@@ -404,18 +404,23 @@ pub fn apply_ui_scale(window: &mut Window, cx: &App) {
 /// appearance is read directly and it repaints; pass `None` from a settings
 /// edit (no window in hand) — every open window is refreshed instead.
 pub fn apply_from_settings(window: Option<&mut Window>, cx: &mut App) {
-    let (appearance, light_name, dark_name, radius) = AppState::try_read(cx).map_or_else(
-        || (Appearance::default(), None, None, None),
-        |state| {
-            let s = state.app_settings();
-            (
-                s.appearance,
-                s.theme_light.clone(),
-                s.theme_dark.clone(),
-                s.ui_radius,
-            )
-        },
-    );
+    let (appearance, light_name, dark_name, radius, accent_override) = AppState::try_read(cx)
+        .map_or_else(
+            || (Appearance::default(), None, None, None, None),
+            |state| {
+                let s = state.app_settings();
+                (
+                    s.appearance,
+                    s.theme_light.clone(),
+                    s.theme_dark.clone(),
+                    s.ui_radius,
+                    s.accent_color.map(openlogi_core::color::Rgb::packed),
+                )
+            },
+        );
+    // Before the theme is touched: `normalize_theme_accent` and every
+    // hand-painted accent read it.
+    openlogi_ui::color::set_accent(accent_override);
 
     // Sync the native window chrome (titlebar) to the pref first, so the
     // `System` branch below reads the *real* OS appearance rather than a stale
@@ -465,6 +470,9 @@ pub fn apply_from_settings(window: Option<&mut Window>, cx: &mut App) {
 
     let theme = Theme::global_mut(cx);
     normalize_theme_contrast(theme);
+    if accent_override.is_some() {
+        apply_accent_override(theme, accent());
+    }
     if let Some(radius) = radius {
         theme.radius = px(f32::from(radius));
     }
@@ -472,20 +480,60 @@ pub fn apply_from_settings(window: Option<&mut Window>, cx: &mut App) {
     cx.refresh_windows();
 }
 
+/// Hover and pressed fills for a solid `accent`: a step darker each, the way
+/// the bundled themes step their blue (`primary` → `primary.hover` → `.active`).
+fn accent_states(accent: Hsla) -> (Hsla, Hsla) {
+    let darker = |by: f32| Hsla {
+        l: (accent.l - by).max(0.0),
+        ..accent
+    };
+    (darker(0.05), darker(0.12))
+}
+
+/// The label on a solid `accent` fill: white or black, whichever reads better.
+fn accent_label(accent: Hsla) -> Hsla {
+    if contrast_ratio(Hsla::white(), accent) >= contrast_ratio(Hsla::black(), accent) {
+        Hsla::white()
+    } else {
+        Hsla::black()
+    }
+}
+
+/// Paint the user's accent over every token the active theme draws its blue
+/// with: the solid primary (toggles, primary buttons), the selected-segment
+/// `accent`, and the focus ring. Run after `Theme::change`, which resets them.
+fn apply_accent_override(theme: &mut Theme, accent: Hsla) {
+    let (hover, active) = accent_states(accent);
+    let label = accent_label(accent);
+    theme.primary = accent;
+    theme.primary_hover = hover;
+    theme.primary_active = active;
+    theme.primary_foreground = label;
+    theme.accent = accent;
+    theme.accent_foreground = label;
+    theme.ring = accent;
+    theme.tokens.primary = accent.into();
+    theme.tokens.primary_hover = hover.into();
+    theme.tokens.primary_active = active.into();
+    theme.tokens.primary_foreground = label.into();
+    theme.tokens.accent = accent.into();
+    theme.tokens.accent_foreground = label.into();
+    theme.tokens.ring = accent.into();
+}
+
 /// Faint accent fill marking a *selected* row / chip — tinted, not painted, so
 /// it reads on both palettes while the label stays in `text_primary` (a blue
-/// label fails AA contrast on the light surface). Hand-matched to [`accent`]
-/// (hue 0.6 / sat 0.9 / light 0.6); the `accent_tint_matches_accent` test pins
-/// that it stays derived from the brand colour.
+/// label fails AA contrast on the light surface). It is [`accent`] at low
+/// alpha, so it follows the user's accent override.
 #[must_use]
 pub fn accent_tint() -> Hsla {
-    hsla(0.6, 0.9, 0.6, 0.12)
+    accent().alpha(0.12)
 }
 
 /// [`accent_tint`] deepened for hover on an already-selected row.
 #[must_use]
 pub fn accent_tint_hover() -> Hsla {
-    hsla(0.6, 0.9, 0.6, 0.18)
+    accent().alpha(0.18)
 }
 
 /// Chaining helpers expressing the single "selected" decision — accent border
@@ -832,6 +880,23 @@ mod tests {
             panic!("{key} should be a six-digit hex color");
         };
         color.into()
+    }
+
+    #[test]
+    fn accent_override_states_step_darker_and_label_is_legible() {
+        for packed in [0x003b_82f6_u32, 0x00e1_1d48, 0x00fa_cc15, 0x0016_a34a] {
+            let base: Hsla = rgb(packed).into();
+            let (hover, active) = accent_states(base);
+            assert!(hover.l < base.l && active.l < hover.l, "{packed:06x}");
+            assert!(
+                (hover.h - base.h).abs() < f32::EPSILON,
+                "hue kept for {packed:06x}"
+            );
+            assert!(
+                contrast_ratio(accent_label(base), base) >= 3.0,
+                "label unreadable on {packed:06x}"
+            );
+        }
     }
 
     /// `accent_tint` is hand-written `hsla` (gpui's `rgb→hsla` isn't `const`),

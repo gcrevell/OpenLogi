@@ -441,6 +441,9 @@ impl RingView {
         cx: &mut Context<Self>,
     ) -> Self {
         let showing = live.showing(invocation.session_id);
+        // The overlay is a separate process from the settings app, so the
+        // user's accent only reaches it on the ring it is asked to draw.
+        color::set_accent(invocation.accent);
         let pointer_changes = cx.observe_in(&pointer, window, |this, pointer, window, cx| {
             // A window that stopped drawing the panel has no slot under the pointer.
             if pointer
@@ -1055,6 +1058,7 @@ mod tests {
             .into(),
             language: None,
             size,
+            accent: None,
         }
     }
 

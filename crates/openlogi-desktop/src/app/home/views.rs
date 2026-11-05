@@ -4,7 +4,7 @@ use crate::ui::theme::FocusRingStyle as _;
 use gpui::{
     AnyElement, App, Context, ElementId, InteractiveElement, IntoElement, ParentElement, Pixels,
     Rems, RenderOnce, SharedString, StatefulInteractiveElement as _, Styled, Window, div,
-    prelude::FluentBuilder as _, px, rems, rgb,
+    prelude::FluentBuilder as _, px, rems,
 };
 use gpui_kit::base::Button as BaseButton;
 use gpui_kit::component::{
@@ -290,7 +290,7 @@ fn device_card_element(
     .aria_description(device_accessibility_description(record, connectivity))
     .aria_selected(active)
     .cursor_pointer()
-    .hover(move |card| card.border_color(rgb(theme::ACCENT_BLUE)).shadow_sm())
+    .hover(move |card| card.border_color(theme::accent()).shadow_sm())
     .focus_visible(move |card| card.focus_ring(pal))
     .on_click(move |_, _, cx| {
         view.update(cx, |this, cx| {
@@ -400,7 +400,7 @@ fn device_list_row(
         .aria_description(device_accessibility_description(record, connectivity))
         .aria_selected(active)
         .cursor_pointer()
-        .hover(move |row| row.border_color(rgb(theme::ACCENT_BLUE)).shadow_sm())
+        .hover(move |row| row.border_color(theme::accent()).shadow_sm())
         .focus_visible(move |row| row.focus_ring(pal))
         .on_click(move |_, _, cx| {
             view.update(cx, |this, cx| {

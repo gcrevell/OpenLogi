@@ -1986,6 +1986,11 @@ impl Orchestrator {
             layout,
             language: self.config.app_settings.language.clone(),
             size: ring.size,
+            accent: self
+                .config
+                .app_settings
+                .accent_color
+                .map(openlogi_core::color::Rgb::packed),
             rings: ring.rings.clone(),
         })
     }

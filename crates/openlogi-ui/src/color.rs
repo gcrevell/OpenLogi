@@ -12,16 +12,38 @@
 //! `gpui-component` theme, which this crate deliberately does not depend on, and
 //! the overlay never draws them.
 
+use std::sync::atomic::{AtomicU32, Ordering};
+
 use gpui::{Hsla, rgb};
 
 /// Primary action / selection blue. The brand colour, identical in both
 /// appearances.
 pub const ACCENT_BLUE: u32 = 0x003b_82f6;
 
-/// [`ACCENT_BLUE`] as an [`Hsla`], so callers stop re-`rgb()`-ing the constant.
+/// The user's accent override, packed `0x00rrggbb`, or [`NO_OVERRIDE`].
+static ACCENT_OVERRIDE: AtomicU32 = AtomicU32::new(NO_OVERRIDE);
+
+/// Above any packed 24-bit colour, so no real override collides with it.
+const NO_OVERRIDE: u32 = u32::MAX;
+
+/// Make [`accent`] return `packed` (`0x00rrggbb`) instead of [`ACCENT_BLUE`], or
+/// the brand blue again for `None`. Each process sets this from the user's
+/// `accent_color` setting: the settings app from its config, the overlay from
+/// the ring it is asked to draw.
+pub fn set_accent(packed: Option<u32>) {
+    ACCENT_OVERRIDE.store(
+        packed.map_or(NO_OVERRIDE, |colour| colour & 0x00ff_ffff),
+        Ordering::Relaxed,
+    );
+}
+
+/// The active accent as an [`Hsla`]: the user's override, else [`ACCENT_BLUE`].
 #[must_use]
 pub fn accent() -> Hsla {
-    rgb(ACCENT_BLUE).into()
+    match ACCENT_OVERRIDE.load(Ordering::Relaxed) {
+        NO_OVERRIDE => rgb(ACCENT_BLUE).into(),
+        packed => rgb(packed).into(),
+    }
 }
 
 /// The accent at a different lightness, keeping its hue and saturation.
@@ -42,12 +64,34 @@ pub fn accent_at_lightness(lightness: f32) -> Hsla {
 mod tests {
     use super::*;
 
+    /// Serialises the tests that read or move the process-global override.
+    static GLOBAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn set_accent_overrides_and_resets() {
+        let _guard = GLOBAL
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let brand = accent();
+        set_accent(Some(0x00e1_1d48));
+        assert_eq!(Hsla::from(rgb(0x00e1_1d48)), accent());
+        assert!(
+            (accent_at_lightness(0.48).h - Hsla::from(rgb(0x00e1_1d48)).h).abs() < f32::EPSILON,
+            "shades follow the override"
+        );
+        set_accent(None);
+        assert_eq!(brand, accent());
+    }
+
     /// The overlay derives both its selected-slot fill and that slot's border
     /// from [`accent_at_lightness`]. Pin that the derivation carries the brand
     /// hue and saturation through, so an edit there cannot quietly reintroduce
     /// the second accent this module replaced.
     #[test]
     fn accent_shades_keep_the_brand_hue_and_saturation() {
+        let _guard = GLOBAL
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let brand = accent();
         for lightness in [0.48, 0.78] {
             let shade = accent_at_lightness(lightness);
