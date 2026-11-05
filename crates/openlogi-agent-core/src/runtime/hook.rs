@@ -5,7 +5,7 @@
 
 mod diverted;
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::mpsc;
 use std::sync::{Arc, RwLock};
@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 use openlogi_core::binding::{
     Action, Binding, ButtonId, GestureDirection, SwipeAccumulator, default_binding,
 };
-use openlogi_core::config::KeyTrigger;
+use openlogi_core::config::{FunctionKey, KeyTrigger};
 use openlogi_hid::DeviceRoute;
 use openlogi_hook::{
     EventDevice, EventDisposition, Hook, HookEvent, KeyEvent, MouseEvent, source_is_remappable,
@@ -28,6 +28,7 @@ use super::{
     ActionDispatchTarget, ActionDispatcher, PointerPress, PointerSelection, PressToken,
     log_bound_action,
 };
+use crate::action_ring::ActionRingManager;
 use crate::event_monitor::SharedEventMonitor;
 use crate::flow::FlowInput;
 pub(crate) use diverted::DivertedButtons;
@@ -270,6 +271,9 @@ thread_local! {
     /// key-down events are auto-repeat, not replacement presses; their first
     /// matching key-up ends the lifecycle.
     static HELD_KEYS: RefCell<HashSet<u16>> = RefCell::new(HashSet::new());
+    /// Escape went down while a ring was showing and was kept from the
+    /// application, so its release and key repeats are kept too.
+    static ESCAPE_SWALLOWED: Cell<bool> = const { Cell::new(false) };
 }
 
 /// Whether a button event's physical source may be remapped/suppressed.
@@ -510,6 +514,38 @@ fn handle_moved(
 }
 
 /// Remap one function-key edge without blocking the hook callback.
+/// Keep Escape from the application and ask `dismiss` to close the ring, when
+/// a ring is showing and Escape is pressed on its own; `None` for any other
+/// key event, which the rest of the key path handles.
+///
+/// The ring's window never takes focus, so the application underneath keeps
+/// the keyboard and this tap is the only place Escape can be seen. The down
+/// edge is kept so the application does not also act on it, and the repeats
+/// and up edge with it, so the application never sees half a keystroke.
+fn escape_dismisses_ring(
+    event: KeyEvent,
+    ring_showing: bool,
+    dismiss: impl FnOnce(),
+) -> Option<EventDisposition> {
+    if event.keycode != FunctionKey::Esc.keycode() {
+        return None;
+    }
+    if !event.pressed {
+        return ESCAPE_SWALLOWED
+            .replace(false)
+            .then_some(EventDisposition::Suppress);
+    }
+    if ESCAPE_SWALLOWED.get() {
+        return Some(EventDisposition::Suppress);
+    }
+    if !ring_showing || !event.modifiers.is_empty() {
+        return None;
+    }
+    ESCAPE_SWALLOWED.set(true);
+    dismiss();
+    Some(EventDisposition::Suppress)
+}
+
 fn handle_key(
     event: KeyEvent,
     bindings: &SharedKeyboardBindings,
@@ -567,6 +603,7 @@ pub fn start(
     scroll: ScrollInputHandle,
     monitor: SharedEventMonitor,
     flow: FlowInput,
+    ring: Arc<ActionRingManager>,
 ) -> Option<Hook> {
     if !Hook::has_accessibility() {
         warn!(
@@ -630,13 +667,18 @@ pub fn start(
         // HoldShortcut enters the same down/up/cancel lifecycle as a mouse
         // button. The active set pairs key-up even if modifier state or config
         // changes while the key is down.
-        HookEvent::Key(event) => handle_key(
-            event,
-            &keyboard_bindings,
-            &action_tx,
-            &dispatcher,
-            ActionDispatchTarget::capture,
-        ),
+        HookEvent::Key(event) => escape_dismisses_ring(event, ring.showing_hint(), || {
+            dispatcher.request_dismiss_action_ring();
+        })
+        .unwrap_or_else(|| {
+            handle_key(
+                event,
+                &keyboard_bindings,
+                &action_tx,
+                &dispatcher,
+                ActionDispatchTarget::capture,
+            )
+        }),
     });
 
     match result {

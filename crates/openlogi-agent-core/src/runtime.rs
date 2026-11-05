@@ -74,6 +74,8 @@ pub enum ActionRequest {
     },
     /// A button whose press opened the Actions Ring was released.
     ActionsRingTriggerReleased,
+    /// Close the showing Actions Ring without running anything.
+    DismissActionsRing,
     /// Turn the pressing keypad's binding page.
     TurnKeypadPage {
         /// The pressing device.
@@ -795,6 +797,19 @@ impl ActionDispatcher {
     /// Queue one OS-hook up edge without blocking the callback.
     pub(crate) fn try_hook_button_up(&self, button: ButtonId) -> bool {
         self.buttons.try_hook_up(button)
+    }
+
+    /// Ask the lifecycle loop to close the showing Actions Ring. Never blocks,
+    /// so the hook callback may call it.
+    pub(crate) fn request_dismiss_action_ring(&self) {
+        if self
+            .executor
+            .requests
+            .send(ActionRequest::DismissActionsRing)
+            .is_err()
+        {
+            warn!("agent runtime unavailable — Actions Ring dismissal ignored");
+        }
     }
 
     /// Queue one function-key down edge without blocking the hook callback.

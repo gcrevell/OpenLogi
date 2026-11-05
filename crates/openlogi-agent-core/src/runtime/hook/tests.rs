@@ -940,3 +940,79 @@ fn an_unattributed_press_keeps_the_selected_binding_while_that_device_has_not_di
     ));
     assert!(owner.shutdown());
 }
+
+fn escape(pressed: bool) -> KeyEvent {
+    KeyEvent {
+        keycode: FunctionKey::Esc.keycode(),
+        pressed,
+        modifiers: KeyModifiers::default(),
+    }
+}
+
+#[test]
+fn escape_closes_a_showing_ring_and_is_kept_from_the_application() {
+    let mut dismissals = 0;
+    assert_eq!(
+        escape_dismisses_ring(escape(true), true, || dismissals += 1),
+        Some(EventDisposition::Suppress)
+    );
+    assert_eq!(dismissals, 1);
+    assert_eq!(
+        escape_dismisses_ring(escape(false), false, || dismissals += 1),
+        Some(EventDisposition::Suppress),
+        "the release of a kept press is kept too"
+    );
+    assert_eq!(dismissals, 1);
+    assert_eq!(
+        escape_dismisses_ring(escape(false), false, || dismissals += 1),
+        None,
+        "a release with no kept press belongs to the application"
+    );
+}
+
+#[test]
+fn escape_key_repeats_after_the_dismissal_are_kept_without_dismissing_again() {
+    let mut dismissals = 0;
+    escape_dismisses_ring(escape(true), true, || dismissals += 1);
+    assert_eq!(
+        escape_dismisses_ring(escape(true), false, || dismissals += 1),
+        Some(EventDisposition::Suppress)
+    );
+    assert_eq!(dismissals, 1);
+    escape_dismisses_ring(escape(false), false, || dismissals += 1);
+}
+
+#[test]
+fn escape_with_no_ring_showing_is_left_to_the_application() {
+    let mut dismissals = 0;
+    assert_eq!(
+        escape_dismisses_ring(escape(true), false, || dismissals += 1),
+        None
+    );
+    assert_eq!(dismissals, 0);
+}
+
+#[test]
+fn escape_with_a_modifier_is_left_to_the_application() {
+    let mut dismissals = 0;
+    let chord = KeyEvent {
+        modifiers: KeyModifiers {
+            command: true,
+            ..KeyModifiers::default()
+        },
+        ..escape(true)
+    };
+    assert_eq!(escape_dismisses_ring(chord, true, || dismissals += 1), None);
+    assert_eq!(dismissals, 0);
+}
+
+#[test]
+fn other_keys_never_dismiss_a_ring() {
+    let mut dismissals = 0;
+    let other = KeyEvent {
+        keycode: FunctionKey::F5.keycode(),
+        ..escape(true)
+    };
+    assert_eq!(escape_dismisses_ring(other, true, || dismissals += 1), None);
+    assert_eq!(dismissals, 0);
+}
