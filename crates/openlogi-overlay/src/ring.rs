@@ -551,10 +551,10 @@ impl RingView {
                     match presentation
                         .sf_symbol
                         .as_deref()
-                        .and_then(|name| symbol_image(name, glyph_size, glyph))
+                        .and_then(|name| symbol_image(name, glyph_size * SYMBOL_SCALE, glyph))
                     {
                         Some(image) => img(ImageSource::Render(image))
-                            .size(px(glyph_size))
+                            .size(px(glyph_size * SYMBOL_SCALE))
                             .into_any_element(),
                         None => svg()
                             .path(icon_path)
@@ -570,6 +570,11 @@ impl RingView {
 
 /// Pixels rasterised per point of glyph, so a 2× display stays sharp.
 const SYMBOL_OVERSAMPLE: f32 = 2.0;
+
+/// An SF Symbol is drawn a little larger than a bundled glyph's box: its
+/// artwork sits inside more built-in padding, so at the same edge it reads
+/// smaller next to the bundled icons.
+const SYMBOL_SCALE: f32 = 1.2;
 
 type SymbolKey = (String, u32);
 type SymbolImage = Option<Arc<gpui::RenderImage>>;
