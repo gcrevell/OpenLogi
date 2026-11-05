@@ -248,7 +248,7 @@ impl ActionRingManager {
         let mut actions = BTreeMap::new();
         let mut slots = BTreeMap::new();
         for (slot, entry) in layout.slots {
-            let (action, custom_icon, custom_label) = entry.into_parts();
+            let (action, custom_icon, custom_label, sf_symbol) = entry.into_parts();
             let literal = custom_label.is_some();
             slots.insert(
                 slot,
@@ -256,6 +256,7 @@ impl ActionRingManager {
                     label: custom_label.unwrap_or_else(|| action.label()),
                     literal,
                     icon: custom_icon.unwrap_or_else(|| ActionRingIcon::for_action(&action)),
+                    sf_symbol: sf_symbol.map(String::from),
                 },
             );
             actions.insert(slot, action);
@@ -509,7 +510,7 @@ impl ActionRingManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use openlogi_core::binding::{ActionRingConfig, RingAction};
+    use openlogi_core::binding::{ActionRingConfig, RingAction, SfSymbolName};
 
     fn spec() -> ActionRingSessionSpec {
         ActionRingSessionSpec {
@@ -591,6 +592,8 @@ mod tests {
         let mut spec = spec();
         spec.layout
             .set_icon(ActionRingSlot::Top, Some(ActionRingIcon::Keyboard));
+        spec.layout
+            .set_sf_symbol(ActionRingSlot::Top, SfSymbolName::new("scissors").ok());
         spec.language = Some("fr".to_string());
         spec.size = ActionRingSize::Large;
         let invocation = manager.begin(spec);
@@ -600,6 +603,7 @@ mod tests {
                 label: "Cut".to_string(),
                 literal: false,
                 icon: ActionRingIcon::Keyboard,
+                sf_symbol: Some("scissors".to_string()),
             }
         );
         assert_eq!(invocation.language.as_deref(), Some("fr"));

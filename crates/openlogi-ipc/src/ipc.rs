@@ -188,6 +188,8 @@ pub use succession::Identity;
 ///      `Action::OpenActionRing` appended — a ring slot that replaces the
 ///      showing ring with a named layout. `ActionRingInvocation::accent`
 ///      appended, the user's accent colour override.
+///      `ActionRingPresentation::sf_symbol` appended — an SF Symbol name the
+///      macOS overlay draws instead of the bundled icon.
 pub const PROTOCOL_VERSION: u32 = 46;
 
 /// Environment variable through which the agent hands a supervised helper the
@@ -787,6 +789,9 @@ pub struct ActionRingPresentation {
     pub literal: bool,
     /// Fully resolved icon; the overlay does not need the executable action.
     pub icon: ActionRingIcon,
+    /// SF Symbol to draw instead of `icon`. Only macOS can; every other
+    /// overlay, and one whose system lacks the symbol, draws `icon`.
+    pub sf_symbol: Option<String>,
 }
 
 /// One request for the overlay helper to display an Actions Ring.

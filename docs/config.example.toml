@@ -106,6 +106,8 @@ haptics = true
 Top = { action = "Copy", icon = "Keyboard" }
 Right = { action = { OpenApplication = { path = "/Applications/Safari.app", display_name = "Safari" } }, icon = "Applications" }
 Bottom = { action = "ShowDesktop", label = "Desktop" }
+# macOS: an SF Symbol replaces the icon; `icon` is the fallback elsewhere.
+TopRight = { action = "PlayPause", icon = "Play", sf_symbol = "playpause.fill" }
 Left = { action = { OpenActionRing = "music" }, label = "Music" }
 
 # A named ring a slot opens with OpenActionRing. "root" goes back.

@@ -20,6 +20,8 @@ openlogi-hook = { path = "../openlogi-hook" }
 openlogi-ipc = { path = "../openlogi-ipc" }
 openlogi-ui = { path = "../openlogi-ui" }
 anyhow = { workspace = true }
+# The texture an SF Symbol mask is tinted into (GPUI's RenderImage frames).
+image = { version = "0.25", default-features = false }
 gpui = { workspace = true }
 gpui_platform = { workspace = true }
 rust-i18n = "4"
@@ -46,7 +48,9 @@ core-graphics = { workspace = true }
 objc2 = { workspace = true }
 # NSScreen: the notice sits above the Dock, so it needs each screen's visible frame.
 # NSPanel: a click must not make the ring the key window.
-objc2-app-kit = { workspace = true, features = ["NSApplication", "NSResponder", "NSWindow", "NSPanel", "NSEvent", "NSScreen", "block2"] }
+# NSImage/NSBitmapImageRep/NSGraphicsContext: SF Symbols are rasterised to a mask.
+objc2-app-kit = { workspace = true, features = ["NSApplication", "NSResponder", "NSWindow", "NSPanel", "NSEvent", "NSScreen", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphics", "NSGraphicsContext", "block2"] }
+objc2-foundation = { workspace = true, features = ["NSString", "NSGeometry"] }
 # NSEvent global-monitor handlers are ObjC blocks (click-away dismissal).
 block2 = { workspace = true }
 

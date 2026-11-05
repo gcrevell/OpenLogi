@@ -7,20 +7,23 @@
 //! the same panel is drawn at the pointer, in the one window that heard it last.
 
 use gpui::{
-    Bounds, BoxShadow, ClickEvent, Context, Div, Entity, Hsla, InteractiveElement, IntoElement,
-    MouseMoveEvent, ParentElement, PathBuilder, Pixels, Point, Render, SharedString, Size,
-    StatefulInteractiveElement as _, Styled, Subscription, Window, WindowAppearance,
-    WindowBackgroundAppearance, WindowId, WindowKind, WindowOptions, canvas, div,
+    Bounds, BoxShadow, ClickEvent, Context, Div, Entity, Hsla, ImageSource, InteractiveElement,
+    IntoElement, MouseMoveEvent, ParentElement, PathBuilder, Pixels, Point, Render, SharedString,
+    Size, StatefulInteractiveElement as _, Styled, Subscription, Window, WindowAppearance,
+    WindowBackgroundAppearance, WindowId, WindowKind, WindowOptions, canvas, div, img,
     linear_color_stop, linear_gradient, point, prelude::FluentBuilder as _, px, svg,
 };
 use openlogi_core::binding::{Action, ActionRingSize, ActionRingSlot};
 use openlogi_ipc::ActionRingInvocation;
 use openlogi_ui::action_icons::RING_CANCEL_ICON;
 use openlogi_ui::color;
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
 use crate::ipc::OverlayCommand;
+use crate::platform::symbol::{self, SymbolMask};
 use crate::session::{self, ClickAwaySession, ShowingRing};
 
 /// The ring's dimensions at one [`ActionRingSize`], in points.
@@ -544,10 +547,78 @@ impl RingView {
                         slot.bg(colors.slot)
                     }
                 })
-                .child(svg().path(icon_path).size(px(glyph_size)).text_color(glyph))
+                .child(
+                    match presentation
+                        .sf_symbol
+                        .as_deref()
+                        .and_then(|name| symbol_image(name, glyph_size * SYMBOL_SCALE, glyph))
+                    {
+                        Some(image) => img(ImageSource::Render(image))
+                            .size(px(glyph_size * SYMBOL_SCALE))
+                            .into_any_element(),
+                        None => svg()
+                            .path(icon_path)
+                            .size(px(glyph_size))
+                            .text_color(glyph)
+                            .into_any_element(),
+                    },
+                )
                 .into_any_element(),
         )
     }
+}
+
+/// Pixels rasterised per point of glyph, so a 2× display stays sharp.
+const SYMBOL_OVERSAMPLE: f32 = 2.0;
+
+/// An SF Symbol is drawn a little larger than a bundled glyph's box: its
+/// artwork sits inside more built-in padding, so at the same edge it reads
+/// smaller next to the bundled icons.
+const SYMBOL_SCALE: f32 = 1.2;
+
+type SymbolKey = (String, u32);
+type SymbolImage = Option<Arc<gpui::RenderImage>>;
+
+thread_local! {
+    /// Rasterised symbol masks by name and edge; `None` remembers a symbol this
+    /// system could not draw so a render does not ask AppKit again.
+    static SYMBOL_MASKS: RefCell<HashMap<SymbolKey, Option<SymbolMask>>> =
+        RefCell::new(HashMap::new());
+    /// Tinted textures, so a repaint reuses the texture instead of uploading a
+    /// new one. Keyed by the colour's bytes; the set is bounded by the symbols
+    /// configured times the handful of ring colours.
+    static SYMBOL_IMAGES: RefCell<HashMap<(SymbolKey, [u8; 4]), SymbolImage>> =
+        RefCell::new(HashMap::new());
+}
+
+/// The SF Symbol `name` as a texture in `glyph`'s colour, or `None` when it
+/// cannot be drawn here and the slot's bundled icon should be used instead.
+fn symbol_image(name: &str, glyph_size: f32, glyph: Hsla) -> Option<Arc<gpui::RenderImage>> {
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "glyph sizes are a few tens of points; clamped before the cast"
+    )]
+    let edge = (glyph_size * SYMBOL_OVERSAMPLE).ceil().clamp(1.0, 512.0) as u32;
+    let color = gpui::Rgba::from(glyph);
+    let bytes = [color.r, color.g, color.b, color.a].map(symbol::unit_to_byte);
+    let key = (name.to_owned(), edge);
+    SYMBOL_IMAGES.with(|images| {
+        images
+            .borrow_mut()
+            .entry((key.clone(), bytes))
+            .or_insert_with(|| {
+                SYMBOL_MASKS.with(|masks| {
+                    masks
+                        .borrow_mut()
+                        .entry(key)
+                        .or_insert_with_key(|(name, edge)| symbol::rasterize(name, *edge))
+                        .as_ref()
+                        .and_then(|mask| mask.tinted(color))
+                })
+            })
+            .clone()
+    })
 }
 
 impl RingView {
@@ -1053,6 +1124,7 @@ mod tests {
                     label: "Copy".to_string(),
                     literal: true,
                     icon: ActionRingIcon::Copy,
+                    sf_symbol: None,
                 },
             )]
             .into(),

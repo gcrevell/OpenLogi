@@ -625,4 +625,18 @@ An Actions Ring entry wraps the action and may add an icon or literal label:
 Top = { action = { CustomShortcut = "Cmd+Shift+P" }, icon = "Keyboard", label = "Command Palette" }
 ```
 
+On macOS an entry may name an [SF Symbol](https://developer.apple.com/sf-symbols/)
+with `sf_symbol` instead of choosing a bundled `icon`:
+
+```toml
+Bottom = { action = "PlayPause", sf_symbol = "playpause.fill" }
+```
+
+The name is as shown in Apple's SF Symbols app (ASCII letters, digits and dots;
+anything else fails to parse). It is drawn in the ring's glyph colour. On other
+platforms, and when the macOS release does not have that symbol, the ring draws
+the entry's `icon`, or the action's own icon if there is none — so setting both
+is a sensible way to keep one config portable. The desktop app's icon picker
+does not edit `sf_symbol`, but it keeps it.
+
 `ShowActionsRing` is rejected inside a ring slot to prevent recursive rings.
