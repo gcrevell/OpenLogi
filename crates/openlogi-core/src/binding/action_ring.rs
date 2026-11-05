@@ -16,7 +16,7 @@ use crate::app::{AppAliases, overlay_for, profile_key_for};
 
 mod icon;
 
-pub use icon::ActionRingIcon;
+pub use icon::{ActionRingIcon, SfSymbolName, SfSymbolNameError};
 
 /// The [`Action::OpenActionRing`] target that returns to the ring a session
 /// opened with — the default or per-app layout — rather than naming an entry of
@@ -193,6 +193,8 @@ pub struct ActionRingEntry {
     icon: Option<ActionRingIcon>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sf_symbol: Option<SfSymbolName>,
 }
 
 impl ActionRingEntry {
@@ -203,6 +205,7 @@ impl ActionRingEntry {
             action,
             icon: None,
             label: None,
+            sf_symbol: None,
         }
     }
 
@@ -226,11 +229,31 @@ impl ActionRingEntry {
         self.label.as_deref()
     }
 
-    /// Consume the entry into its executable action and presentation
-    /// overrides (icon, label).
+    /// SF Symbol drawn in place of the bundled icon on macOS. Elsewhere, and
+    /// when the system has no such symbol, the ring falls back to
+    /// [`Self::custom_icon`] or the action's own icon.
     #[must_use]
-    pub fn into_parts(self) -> (Action, Option<ActionRingIcon>, Option<String>) {
-        (self.action.into_action(), self.icon, self.label)
+    pub const fn sf_symbol(&self) -> Option<&SfSymbolName> {
+        self.sf_symbol.as_ref()
+    }
+
+    /// Consume the entry into its executable action and presentation
+    /// overrides (icon, label, SF Symbol).
+    #[must_use]
+    pub fn into_parts(
+        self,
+    ) -> (
+        Action,
+        Option<ActionRingIcon>,
+        Option<String>,
+        Option<SfSymbolName>,
+    ) {
+        (
+            self.action.into_action(),
+            self.icon,
+            self.label,
+            self.sf_symbol,
+        )
     }
 
     fn replace_action(&mut self, action: RingAction) {
@@ -243,6 +266,10 @@ impl ActionRingEntry {
 
     fn set_label(&mut self, label: Option<String>) {
         self.label = label;
+    }
+
+    fn set_sf_symbol(&mut self, symbol: Option<SfSymbolName>) {
+        self.sf_symbol = symbol;
     }
 }
 
@@ -274,6 +301,13 @@ impl ActionRingLayout {
     pub fn set_icon(&mut self, slot: ActionRingSlot, icon: Option<ActionRingIcon>) {
         if let Some(entry) = self.slots.get_mut(&slot) {
             entry.set_icon(icon);
+        }
+    }
+
+    /// Set an SF Symbol for a populated slot. Empty slots remain empty.
+    pub fn set_sf_symbol(&mut self, slot: ActionRingSlot, symbol: Option<SfSymbolName>) {
+        if let Some(entry) = self.slots.get_mut(&slot) {
+            entry.set_sf_symbol(symbol);
         }
     }
 
@@ -539,10 +573,49 @@ mod tests {
     }
 
     #[test]
+    fn sf_symbol_slots_parse_roundtrip_and_keep_the_fallback_icon() {
+        let layout = toml::from_str::<ActionRingLayout>(
+            r#"
+[slots]
+Top = { action = "PlayPause", icon = "Play", sf_symbol = "playpause.fill" }
+"#,
+        )
+        .expect("an sf_symbol slot failed to parse");
+        let entry = &layout.slots[&ActionRingSlot::Top];
+        assert_eq!(
+            entry.sf_symbol().map(SfSymbolName::as_str),
+            Some("playpause.fill")
+        );
+        assert_eq!(entry.custom_icon(), Some(ActionRingIcon::Play));
+        let encoded = toml::to_string(&layout).expect("could not serialize ring layout");
+        let decoded = toml::from_str::<ActionRingLayout>(&encoded)
+            .expect("could not deserialize ring layout");
+        assert_eq!(decoded, layout);
+    }
+
+    #[test]
+    fn a_malformed_symbol_name_fails_the_parse() {
+        let error =
+            toml::from_str::<ActionRingEntry>("action = \"Copy\"\nsf_symbol = \"../etc/passwd\"")
+                .expect_err("a symbol name with path characters must be rejected");
+        assert!(error.to_string().contains("SF Symbol"), "got: {error}");
+    }
+
+    #[test]
+    fn clearing_a_slot_cannot_leave_an_orphan_sf_symbol() {
+        let mut layout = ActionRingLayout::default();
+        layout.set_sf_symbol(ActionRingSlot::Top, SfSymbolName::new("star.fill").ok());
+        assert!(layout.slots[&ActionRingSlot::Top].sf_symbol().is_some());
+        layout.set_action(ActionRingSlot::Top, None);
+        assert!(!layout.slots.contains_key(&ActionRingSlot::Top));
+    }
+
+    #[test]
     fn unlabelled_entries_serialize_without_a_label_key() {
         let layout = ActionRingLayout::default();
         let encoded = toml::to_string(&layout).expect("could not serialize ring layout");
         assert!(!encoded.contains("label"));
+        assert!(!encoded.contains("sf_symbol"));
     }
 
     #[test]

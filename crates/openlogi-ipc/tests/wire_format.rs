@@ -521,6 +521,7 @@ fn action_ring_types() {
                     label: "Cut".to_string(),
                     literal: false,
                     icon: ActionRingIcon::Keyboard,
+                    sf_symbol: None,
                 },
             )]),
             language: Some("fr".to_string()),
@@ -528,17 +529,29 @@ fn action_ring_types() {
             accent: Some(0x00e1_1d48),
         },
         // The size is one byte after the locale, then the optional accent: a
-        // presence byte and the packed colour as a varint-encoded u32.
-        "2a0100034375740007010266720201fc481de100",
+        // presence byte and the packed colour as a varint-encoded u32. The
+        // `00` after the icon is the slot's absent SF Symbol.
+        "2a010003437574000700010266720201fc481de100",
     );
-    // The literal flag is one byte between label and icon.
+    // The literal flag is one byte between label and icon; the SF Symbol is a
+    // trailing option.
     assert_wire(
         &ActionRingPresentation {
             label: "Cut".to_string(),
             literal: true,
             icon: ActionRingIcon::Keyboard,
+            sf_symbol: None,
         },
-        "034375740107",
+        "03437574010700",
+    );
+    assert_wire(
+        &ActionRingPresentation {
+            label: "Cut".to_string(),
+            literal: true,
+            icon: ActionRingIcon::Keyboard,
+            sf_symbol: Some("star".to_string()),
+        },
+        "034375740107010473746172",
     );
     assert_wire(&ActionRingSize::Small, "00");
     assert_wire(&ActionRingSize::Large, "02");

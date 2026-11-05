@@ -1,3 +1,5 @@
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 
 use super::super::Action;
@@ -329,3 +331,93 @@ macro_rules! derive_action_icon {
 }
 
 super::super::action::for_each_unit_action!(derive_action_icon);
+
+/// Name of an SF Symbol (`"play.fill"`, `"speaker.wave.2"`), as shown in
+/// Apple's SF Symbols app.
+///
+/// Only the spelling is checked here — ASCII letters, digits and dots, the
+/// whole alphabet of the symbol catalogue — because whether the symbol exists
+/// depends on the macOS release the overlay runs on. The overlay falls back to
+/// the slot's bundled icon when the system does not know the name.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct SfSymbolName(String);
+
+/// Why a string is not an [`SfSymbolName`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SfSymbolNameError;
+
+impl fmt::Display for SfSymbolNameError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("an SF Symbol name is ASCII letters, digits and dots, e.g. \"play.fill\"")
+    }
+}
+
+impl std::error::Error for SfSymbolNameError {}
+
+impl SfSymbolName {
+    /// Longest name the catalogue comes near (`"rectangle.3.group.bubble.left"`
+    /// is 29); the cap only bounds what a config file can make the overlay look up.
+    const MAX_LEN: usize = 96;
+
+    /// Validate `name` as an SF Symbol name.
+    ///
+    /// # Errors
+    /// [`SfSymbolNameError`] when `name` is empty, too long, or holds
+    /// anything but ASCII letters, digits and dots.
+    pub fn new(name: impl Into<String>) -> Result<Self, SfSymbolNameError> {
+        let name = name.into();
+        let valid = !name.is_empty()
+            && name.len() <= Self::MAX_LEN
+            && name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'.');
+        if valid {
+            Ok(Self(name))
+        } else {
+            Err(SfSymbolNameError)
+        }
+    }
+
+    /// The symbol name.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<String> for SfSymbolName {
+    type Error = SfSymbolNameError;
+
+    fn try_from(name: String) -> Result<Self, Self::Error> {
+        Self::new(name)
+    }
+}
+
+impl From<SfSymbolName> for String {
+    fn from(name: SfSymbolName) -> Self {
+        name.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SfSymbolName;
+
+    #[test]
+    fn catalogue_spellings_are_accepted() {
+        for name in ["play.fill", "speaker.wave.2", "1.circle", "star"] {
+            assert!(SfSymbolName::new(name).is_ok(), "{name} should be valid");
+        }
+    }
+
+    #[test]
+    fn anything_else_is_rejected() {
+        for name in ["", "play fill", "a/b", "é", "play-fill", &"a".repeat(97)] {
+            assert!(
+                SfSymbolName::new(name).is_err(),
+                "{name:?} should be invalid"
+            );
+        }
+    }
+}

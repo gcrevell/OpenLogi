@@ -3,6 +3,7 @@
 
 #[cfg(not(target_os = "windows"))]
 mod placement;
+pub(crate) mod symbol;
 // Keep Windows geometry tests runnable on the host; only native.rs needs Win32.
 #[cfg(any(target_os = "windows", test))]
 mod windows;
