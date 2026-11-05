@@ -213,7 +213,12 @@ Common device fields are:
   reports only in host mode. Otherwise the agent leaves the onboard mode alone
 - `action_ring`: default and complete per-application eight-slot layouts;
   `action_ring.per_app` takes the same selectors as `per_app_bindings`,
-  including the Windows `exe:<filename>` fallback and `app:<alias>` keys
+  including the Windows `exe:<filename>` fallback and `app:<alias>` keys.
+  `action_ring.rings.<name>` holds named layouts that a slot opens with
+  `{ OpenActionRing = "<name>" }`, replacing the showing ring in place. The
+  reserved name `root` returns to the ring the session opened with. A slot
+  naming a ring that does not exist, or one with no slots, closes the ring like
+  any other action
 - `lighting`, `smartshift`, and camera controls / profiles
 - `camera_stream_mode`: the live preview's mode, a table of `width`, `height`
   (pixels) and `fps`. All three are required and must be positive, or the file

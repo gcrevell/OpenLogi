@@ -7,7 +7,11 @@ use std::sync::{
     atomic::{AtomicU64, AtomicUsize, Ordering},
 };
 
+use std::time::{Duration, Instant};
+
 use anyhow::{Context as _, Result};
+use openlogi_core::action_ring::DISPLAY_LIFETIME;
+use openlogi_hook::CursorPosition;
 use openlogi_ipc::{Identity, PROTOCOL_VERSION, RUN_ENV};
 use succession::{Allegiance, Compat, Record, Role, Run, Tenancy, Tenant};
 use tokio::sync::mpsc;
@@ -15,6 +19,44 @@ use tracing::warn;
 
 use crate::platform;
 use crate::ring::RingView;
+
+/// Where the showing ring was placed, so a ring that replaces it opens in the
+/// same place.
+///
+/// A slot that opens another ring reaches the overlay as a new invocation with
+/// no "no ring" between, where an unrelated ring always follows one. That is
+/// the whole signal: the cursor at that moment is over the slot that was
+/// clicked, not the ring's centre. The anchor also expires with the ring's own
+/// display lifetime, so one the overlay missed the closing of cannot place a
+/// later, unrelated ring.
+#[derive(Default)]
+pub(crate) struct RingAnchor {
+    placed: Option<(CursorPosition, Instant)>,
+}
+
+impl RingAnchor {
+    /// The cursor to place a ring that arrives at `now` around, or `None` to
+    /// follow the live cursor.
+    pub(crate) fn pin(&self, now: Instant) -> Option<CursorPosition> {
+        self.placed
+            .filter(|(_, at)| now.saturating_duration_since(*at) < ring_lifetime())
+            .map(|(cursor, _)| cursor)
+    }
+
+    /// A ring opened at `now` around `cursor`.
+    pub(crate) fn opened(&mut self, cursor: Option<CursorPosition>, now: Instant) {
+        self.placed = cursor.map(|cursor| (cursor, now));
+    }
+
+    /// The agent reported no ring: the next one is not a replacement.
+    pub(crate) fn closed(&mut self) {
+        self.placed = None;
+    }
+}
+
+fn ring_lifetime() -> Duration {
+    DISPLAY_LIFETIME
+}
 
 pub(crate) struct ClickAwaySession {
     session_id: AtomicU64,
@@ -224,6 +266,53 @@ pub(crate) fn spawned_by() -> Option<Run> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const HERE: CursorPosition = CursorPosition { x: 10.0, y: 20.0 };
+
+    #[test]
+    fn a_ring_after_no_ring_follows_the_live_cursor() {
+        let now = Instant::now();
+        let mut anchor = RingAnchor::default();
+        assert_eq!(anchor.pin(now), None);
+        anchor.opened(Some(HERE), now);
+        anchor.closed();
+        assert_eq!(anchor.pin(now), None);
+    }
+
+    #[test]
+    fn a_ring_replacing_the_showing_one_opens_where_it_did() {
+        let now = Instant::now();
+        let mut anchor = RingAnchor::default();
+        anchor.opened(Some(HERE), now);
+        assert_eq!(anchor.pin(now + Duration::from_secs(1)), Some(HERE));
+    }
+
+    #[test]
+    fn a_chain_of_replacements_keeps_the_first_rings_place() {
+        let now = Instant::now();
+        let mut anchor = RingAnchor::default();
+        anchor.opened(Some(HERE), now);
+        let later = now + Duration::from_secs(1);
+        let pinned = anchor.pin(later);
+        anchor.opened(pinned, later);
+        assert_eq!(anchor.pin(later + Duration::from_secs(1)), Some(HERE));
+    }
+
+    #[test]
+    fn an_anchor_outlives_neither_the_ring_nor_a_missed_close() {
+        let now = Instant::now();
+        let mut anchor = RingAnchor::default();
+        anchor.opened(Some(HERE), now);
+        assert_eq!(anchor.pin(now + ring_lifetime()), None);
+    }
+
+    #[test]
+    fn a_ring_placed_by_the_platform_leaves_nothing_to_pin() {
+        let now = Instant::now();
+        let mut anchor = RingAnchor::default();
+        anchor.opened(None, now);
+        assert_eq!(anchor.pin(now), None);
+    }
 
     #[test]
     fn no_click_is_observed_when_no_ring_is_showing() {

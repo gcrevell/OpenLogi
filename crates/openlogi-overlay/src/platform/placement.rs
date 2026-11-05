@@ -1,5 +1,7 @@
 //! GPUI placement on macOS and Linux.
 
+use openlogi_hook::CursorPosition;
+
 use gpui::{
     Bounds, DisplayId, Pixels, PlatformDisplay, Point, Size, WindowBounds, WindowOptions, point, px,
 };
@@ -11,6 +13,8 @@ use crate::ring::{Placement, clamp_window_origin, ring_window_options};
 /// Captured placement for one invocation, before its windows are opened.
 pub(crate) struct RingPlacement {
     alternatives: Vec<Vec<(WindowOptions, Placement)>>,
+    /// The cursor the ring is placed around, when it could be read.
+    cursor: Option<CursorPosition>,
 }
 
 impl RingPlacement {
@@ -18,8 +22,13 @@ impl RingPlacement {
         clippy::unnecessary_wraps,
         reason = "the Windows placement capture is fallible"
     )]
-    /// Where to open a ring whose window is `edge` across.
-    pub(crate) fn capture(cx: &mut gpui::App, edge: Pixels) -> anyhow::Result<Self> {
+    /// Where to open a ring whose window is `edge` across: around `at`, or
+    /// around the cursor when `at` is `None`.
+    pub(crate) fn capture_at(
+        cx: &mut gpui::App,
+        edge: Pixels,
+        at: Option<CursorPosition>,
+    ) -> anyhow::Result<Self> {
         if on_wayland() {
             let displays = cx.displays();
             if !displays.is_empty() {
@@ -45,13 +54,22 @@ impl RingPlacement {
                         .into_iter()
                         .filter(|windows: &Vec<_>| !windows.is_empty())
                         .collect(),
+                    cursor: None,
                 });
             }
             warn!("no displays reported; falling back to a positioned Actions Ring window");
         }
+        let cursor = at.or_else(openlogi_hook::cursor_position);
         Ok(Self {
-            alternatives: vec![vec![positioned_window(cx, edge)]],
+            alternatives: vec![vec![positioned_window(cx, edge, cursor)]],
+            cursor,
         })
+    }
+
+    /// The cursor this ring was placed around, or `None` where the platform
+    /// places the ring itself.
+    pub(crate) const fn cursor(&self) -> Option<CursorPosition> {
+        self.cursor
     }
 
     /// Sets of windows to try in order, each window's options paired with how
@@ -122,8 +140,8 @@ struct CursorScreen {
     clippy::cast_possible_truncation,
     reason = "native cursor coordinates are screen-sized and exactly usable as GPUI f32 pixels"
 )]
-fn cursor_screen(cx: &gpui::App) -> CursorScreen {
-    let cursor = openlogi_hook::cursor_position();
+fn cursor_screen(cx: &gpui::App, at: Option<CursorPosition>) -> CursorScreen {
+    let cursor = at;
     // macOS GPUI bounds are display-relative; translate the global cursor
     // into the native display's space.
     let native_display = cursor
@@ -162,9 +180,13 @@ fn cursor_screen(cx: &gpui::App) -> CursorScreen {
     }
 }
 
-fn positioned_window(cx: &gpui::App, edge: Pixels) -> (WindowOptions, Placement) {
+fn positioned_window(
+    cx: &gpui::App,
+    edge: Pixels,
+    cursor: Option<CursorPosition>,
+) -> (WindowOptions, Placement) {
     let size = Size::new(edge, edge);
-    let screen = cursor_screen(cx);
+    let screen = cursor_screen(cx, cursor);
     let center = screen
         .cursor
         .or_else(|| screen.bounds.map(|bounds| bounds.center()))
@@ -184,7 +206,7 @@ fn positioned_window(cx: &gpui::App, edge: Pixels) -> (WindowOptions, Placement)
 /// The notice at the bottom centre of the cursor's display, above the Dock
 /// where the platform reports it.
 fn positioned_notice(cx: &gpui::App, size: Size<Pixels>) -> WindowOptions {
-    let screen = cursor_screen(cx);
+    let screen = cursor_screen(cx, openlogi_hook::cursor_position());
     let origin = screen
         .usable
         .or(screen.bounds)

@@ -93,6 +93,7 @@ pub(crate) fn action_icon_path(action: &Action) -> &'static str {
         Action::NextDesktop => "action-icons/square-arrow-right.svg",
         Action::ShowDesktop => "action-icons/monitor.svg",
         Action::LaunchpadShow | Action::OpenApplication(_) => "action-icons/grid-3x3.svg",
+        Action::OpenActionRing(_) => "action-icons/folder.svg",
         Action::LockScreen => "action-icons/lock.svg",
         Action::Screenshot | Action::CaptureRegion => "action-icons/camera.svg",
         Action::Sleep => "action-icons/moon.svg",

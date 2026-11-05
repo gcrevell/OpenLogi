@@ -28,6 +28,7 @@ mod windowing;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::Instant;
 
 use anyhow::Result;
 use gpui::AppContext as _;
@@ -41,7 +42,7 @@ use crate::notice::NoticeShelf;
 use crate::platform::RingPlacement;
 use crate::ring::{Geometry, RingPointer, RingView};
 use crate::session::{
-    ClickAwaySession, claim_the_role, close_all_ring_windows, close_ring_windows,
+    ClickAwaySession, RingAnchor, claim_the_role, close_all_ring_windows, close_ring_windows,
     spawn_click_away_dismissal,
 };
 
@@ -120,12 +121,14 @@ fn main() -> Result<()> {
             }
         })
         .detach();
+        let anchor = Rc::new(RefCell::new(RingAnchor::default()));
         cx.spawn(async move |cx| {
             while let Some(observed) = invocations.recv().await {
                 // No ring is what a dismissal looks like: close whatever is
                 // showing and open nothing. The agent has already forgotten the
                 // session, so there is nothing to acknowledge either.
                 let Some(invocation) = observed else {
+                    anchor.borrow_mut().closed();
                     cx.update(close_all_ring_windows);
                     continue;
                 };
@@ -147,7 +150,11 @@ fn main() -> Result<()> {
                             reason = "only the Wayland placement drains its openings"
                         )
                     )]
-                    let mut placement = match RingPlacement::capture(cx, edge) {
+                    let mut placement = match RingPlacement::capture_at(
+                        cx,
+                        edge,
+                        anchor.borrow().pin(Instant::now()),
+                    ) {
                         Ok(placement) => placement,
                         Err(error) => {
                             warn!(%error, "could not locate Actions Ring display");
@@ -157,6 +164,9 @@ fn main() -> Result<()> {
                             return;
                         }
                     };
+                    anchor
+                        .borrow_mut()
+                        .opened(placement.cursor(), Instant::now());
                     let commands = commands.clone();
                     let timeout_commands = commands.clone();
                     let session_id = invocation.session_id;

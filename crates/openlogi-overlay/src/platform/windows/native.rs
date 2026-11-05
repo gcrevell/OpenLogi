@@ -26,7 +26,13 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 use super::{NoticePlacement, RingPlacement};
 
 impl RingPlacement {
-    pub(crate) fn capture(_cx: &mut App, edge: Pixels) -> Result<Self> {
+    /// Windows places the ring at the native cursor; a ring replacing another
+    /// does not yet keep its position, so `_at` is ignored.
+    pub(crate) fn capture_at(
+        _cx: &mut App,
+        edge: Pixels,
+        _at: Option<openlogi_hook::CursorPosition>,
+    ) -> Result<Self> {
         let sample = sample_monitor()?;
         Ok(Self {
             display_id: sample.display_id,
@@ -35,6 +41,15 @@ impl RingPlacement {
             dpi: sample.dpi,
             edge,
         })
+    }
+
+    /// Windows does not report the cursor a ring is placed around.
+    #[expect(
+        clippy::unused_self,
+        reason = "mirrors the GPUI placement, which reports the cursor it used"
+    )]
+    pub(crate) const fn cursor(&self) -> Option<openlogi_hook::CursorPosition> {
+        None
     }
 
     pub(crate) fn show(self, window: &mut Window) -> Result<()> {
