@@ -344,6 +344,9 @@ impl Armed {
                         running.begin_action_ring(device_key.as_deref()).await;
                     }
                     ActionRequest::ActionsRingTriggerReleased => running.release_action_ring(),
+                    ActionRequest::DismissActionsRing => {
+                        running.dismiss_action_ring();
+                    }
                     ActionRequest::TurnKeypadPage { device_key, turn } => {
                         running
                             .orchestrator
@@ -585,8 +588,7 @@ impl Running {
 
     async fn begin_action_ring(&self, device_key: Option<&str>) {
         // A second trigger press while the ring is showing closes it.
-        if let Some(dismissed) = self.inputs.ring.dismiss_active() {
-            self.ring_haptics.end_session(dismissed);
+        if self.dismiss_action_ring() {
             return;
         }
         if let Some(session) = self
@@ -604,6 +606,16 @@ impl Running {
             self.ring_haptics
                 .begin_session(invocation.session_id, haptic_route);
         }
+    }
+
+    /// Close the showing ring, if any, and end its haptic session; whether
+    /// there was one.
+    fn dismiss_action_ring(&self) -> bool {
+        let Some(dismissed) = self.inputs.ring.dismiss_active() else {
+            return false;
+        };
+        self.ring_haptics.end_session(dismissed);
+        true
     }
 
     /// The trigger that opened the ring was let go: a held release chooses
@@ -683,6 +695,7 @@ impl Running {
             self.inputs.scroll_input.clone(),
             Arc::clone(&self.event_monitor),
             self.shared.flow.input(),
+            Arc::clone(&self.inputs.ring),
         )
     }
 

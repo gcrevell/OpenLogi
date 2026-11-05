@@ -5,7 +5,7 @@
 //! select only a slot from that authoritative snapshot.
 
 use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
@@ -177,6 +177,9 @@ impl State {
 /// Shared ring state used by input dispatch and IPC handlers.
 pub struct ActionRingManager {
     next_session: AtomicU64,
+    /// [`State::showing`] as of the last publish, readable without the state
+    /// lock for the input hook's callback, which must never wait on one.
+    showing: AtomicBool,
     state: Mutex<State>,
     /// What the overlay observes. Derived from [`Self::state`] after every
     /// change, so "no ring" is simply the absence of one — there is no closed
@@ -194,6 +197,7 @@ impl Default for ActionRingManager {
         });
         Self {
             next_session: AtomicU64::new(1),
+            showing: AtomicBool::new(false),
             state: Mutex::new(State::default()),
             published,
         }
@@ -340,6 +344,14 @@ impl ActionRingManager {
         state.showing()
     }
 
+    /// Whether a ring was showing at the last change, without taking the state
+    /// lock. A ring that expired unobserved still reads as showing until
+    /// something next touches the session, so a caller acts on it through
+    /// [`Self::dismiss_active`], which decides for real.
+    pub fn showing_hint(&self) -> bool {
+        self.showing.load(Ordering::Relaxed)
+    }
+
     /// Subscribe to the latest ring state. Every close path republishes the state.
     /// Rapid updates may replace intermediate states before a subscriber reads them.
     pub fn subscribe(&self) -> watch::Receiver<RingObservation> {
@@ -361,6 +373,7 @@ impl ActionRingManager {
     /// to [`Self::state`], and a republish that says the same thing wakes
     /// nobody.
     fn publish(&self, state: &State) {
+        self.showing.store(state.showing(), Ordering::Relaxed);
         let invocation = state
             .active
             .as_ref()
@@ -896,5 +909,18 @@ mod tests {
             matches!(manager.release(), ActionRingRelease::Kept),
             "the press that chose the slot is spent, so the new ring waits for a pick"
         );
+    }
+
+    #[test]
+    fn the_showing_hint_follows_every_change_of_the_session() {
+        let manager = ActionRingManager::default();
+        assert!(!manager.showing_hint());
+        let invocation = manager.begin(spec());
+        assert!(manager.showing_hint());
+        manager.cancel(invocation.session_id);
+        assert!(!manager.showing_hint());
+        manager.begin(spec());
+        assert!(manager.dismiss_active().is_some());
+        assert!(!manager.showing_hint());
     }
 }
